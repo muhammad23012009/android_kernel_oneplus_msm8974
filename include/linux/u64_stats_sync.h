@@ -27,8 +27,8 @@
  *    (On UP, there is no seqcount_t protection, a reader allowing interrupts could
  *     read partial values)
  *
- * 7) For irq and softirq uses, readers can use u64_stats_fetch_begin_irq() and
- *    u64_stats_fetch_retry_irq() helpers
+ * 7) For softirq uses, readers can use u64_stats_fetch_begin_bh() and
+ *    u64_stats_fetch_retry_bh() helpers
  *
  * Usage :
  *
@@ -67,12 +67,36 @@ struct u64_stats_sync {
 #endif
 };
 
-
-#if BITS_PER_LONG == 32 && defined(CONFIG_SMP)
-# define u64_stats_init(syncp)	seqcount_init(syncp.seq)
+/*
+ * In case softirq handlers can update u64 counters, readers can use following helpers
+ * - SMP 32bit arches use seqcount protection, irq safe.
+ * - UP 32bit must disable BH.
+ * - 64bit have no problem atomically reading u64 values, irq safe.
+ */
+static unsigned int inline u64_stats_fetch_begin_bh(const struct u64_stats_sync *syncp)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	return read_seqcount_begin(&syncp->seq);
 #else
-# define u64_stats_init(syncp)	do { } while (0)
+#if BITS_PER_LONG==32
+	local_bh_disable();
 #endif
+	return 0;
+#endif
+}
+
+static bool inline u64_stats_fetch_retry_bh(const struct u64_stats_sync *syncp,
+					 unsigned int start)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	return read_seqcount_retry(&syncp->seq, start);
+#else
+#if BITS_PER_LONG==32
+	local_bh_enable();
+#endif
+	return false;
+#endif
+}
 
 static inline void u64_stats_update_begin(struct u64_stats_sync *syncp)
 {
