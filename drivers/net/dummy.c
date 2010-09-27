@@ -100,27 +100,21 @@ static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int dummy_dev_init(struct net_device *dev)
 {
-	int i;
 	dev->dstats = alloc_percpu(struct pcpu_dstats);
 	if (!dev->dstats)
 		return -ENOMEM;
 
-	for_each_possible_cpu(i) {
-		struct pcpu_dstats *dstats;
-		dstats = per_cpu_ptr(dev->dstats, i);
-		u64_stats_init(&dstats->syncp);
-	}
 	return 0;
 }
 
-static void dummy_dev_uninit(struct net_device *dev)
+static void dummy_dev_free(struct net_device *dev)
 {
 	free_percpu(dev->dstats);
+	free_netdev(dev);
 }
 
 static const struct net_device_ops dummy_netdev_ops = {
 	.ndo_init		= dummy_dev_init,
-	.ndo_uninit		= dummy_dev_uninit,
 	.ndo_start_xmit		= dummy_xmit,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_rx_mode	= set_multicast_list,
@@ -134,15 +128,15 @@ static void dummy_setup(struct net_device *dev)
 
 	/* Initialize the device structure. */
 	dev->netdev_ops = &dummy_netdev_ops;
-	dev->destructor = free_netdev;
+	dev->destructor = dummy_dev_free;
 
 	/* Fill in device structure with ethernet-generic values. */
 	dev->tx_queue_len = 0;
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
 	dev->features	|= NETIF_F_SG | NETIF_F_FRAGLIST | NETIF_F_TSO;
-	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX;
-	eth_hw_addr_random(dev);
+	dev->features	|= NETIF_F_NO_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX;
+	random_ether_addr(dev->dev_addr);
 }
 
 static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
