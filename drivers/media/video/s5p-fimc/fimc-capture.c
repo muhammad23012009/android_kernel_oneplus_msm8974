@@ -1360,10 +1360,43 @@ static int fimc_subdev_get_crop(struct v4l2_subdev *sd,
 		&ctx->s_frame : &ctx->d_frame;
 
 	mutex_lock(&fimc->lock);
-	r->left	  = ff->offs_h;
-	r->top	  = ff->offs_v;
-	r->width  = ff->width;
-	r->height = ff->height;
+
+	switch (sel->target) {
+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+		f = &ctx->d_frame;
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		r->width = f->o_width;
+		r->height = f->o_height;
+		r->left = 0;
+		r->top = 0;
+		mutex_unlock(&fimc->lock);
+		return 0;
+
+	case V4L2_SEL_TGT_CROP:
+		try_sel = v4l2_subdev_get_try_crop(fh, sel->pad);
+		break;
+	case V4L2_SEL_TGT_COMPOSE:
+		try_sel = v4l2_subdev_get_try_compose(fh, sel->pad);
+		f = &ctx->d_frame;
+		break;
+	default:
+		mutex_unlock(&fimc->lock);
+		return -EINVAL;
+	}
+
+	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
+		sel->r = *try_sel;
+	} else {
+		r->left = f->offs_h;
+		r->top = f->offs_v;
+		r->width = f->width;
+		r->height = f->height;
+	}
+
+	dbg("target %#x: l:%d, t:%d, %dx%d, f_w: %d, f_h: %d",
+	    sel->pad, r->left, r->top, r->width, r->height,
+	    f->f_width, f->f_height);
+
 	mutex_unlock(&fimc->lock);
 
 	dbg("ff:%p, pad%d: l:%d, t:%d, %dx%d, f_w: %d, f_h: %d",
@@ -1391,18 +1424,44 @@ static int fimc_subdev_set_crop(struct v4l2_subdev *sd,
 	mutex_lock(&fimc->lock);
 	fimc_capture_try_crop(ctx, r, crop->pad);
 
-	if (crop->which == V4L2_SUBDEV_FORMAT_TRY) {
+	switch (sel->target) {
+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+		f = &ctx->d_frame;
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		r->width = f->o_width;
+		r->height = f->o_height;
+		r->left = 0;
+		r->top = 0;
 		mutex_unlock(&fimc->lock);
 		*v4l2_subdev_get_try_crop(fh, crop->pad) = *r;
 		return 0;
+
+	case V4L2_SEL_TGT_CROP:
+		try_sel = v4l2_subdev_get_try_crop(fh, sel->pad);
+		break;
+	case V4L2_SEL_TGT_COMPOSE:
+		try_sel = v4l2_subdev_get_try_compose(fh, sel->pad);
+		f = &ctx->d_frame;
+		break;
+	default:
+		mutex_unlock(&fimc->lock);
+		return -EINVAL;
 	}
 	spin_lock_irqsave(&fimc->slock, flags);
 	set_frame_crop(ff, r->left, r->top, r->width, r->height);
 	if (crop->pad == FIMC_SD_PAD_SOURCE)
 		ctx->state |= FIMC_DST_CROP;
 
-	set_bit(ST_CAPT_APPLY_CFG, &fimc->state);
-	spin_unlock_irqrestore(&fimc->slock, flags);
+	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
+		*try_sel = sel->r;
+	} else {
+		spin_lock_irqsave(&fimc->slock, flags);
+		set_frame_crop(f, r->left, r->top, r->width, r->height);
+		set_bit(ST_CAPT_APPLY_CFG, &fimc->state);
+		spin_unlock_irqrestore(&fimc->slock, flags);
+		if (sel->target == V4L2_SEL_TGT_COMPOSE)
+			ctx->state |= FIMC_COMPOSE;
+	}
 
 	dbg("pad%d: (%d,%d)/%dx%d", crop->pad, r->left, r->top,
 	    r->width, r->height);

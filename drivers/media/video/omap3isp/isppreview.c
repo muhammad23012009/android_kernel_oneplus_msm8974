@@ -1838,7 +1838,26 @@ static int preview_get_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
 	if (crop->pad != PREV_PAD_SINK)
 		return -EINVAL;
 
-	crop->rect = *__preview_get_crop(prev, fh, crop->which);
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		sel->r.left = 0;
+		sel->r.top = 0;
+		sel->r.width = INT_MAX;
+		sel->r.height = INT_MAX;
+
+		format = __preview_get_format(prev, fh, PREV_PAD_SINK,
+					      sel->which);
+		preview_try_crop(prev, format, &sel->r);
+		break;
+
+	case V4L2_SEL_TGT_CROP:
+		sel->r = *__preview_get_crop(prev, fh, sel->which);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -1856,8 +1875,8 @@ static int preview_set_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
 	struct isp_prev_device *prev = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *format;
 
-	/* Cropping is only supported on the sink pad. */
-	if (crop->pad != PREV_PAD_SINK)
+	if (sel->target != V4L2_SEL_TGT_CROP ||
+	    sel->pad != PREV_PAD_SINK)
 		return -EINVAL;
 
 	/* The crop rectangle can't be changed while streaming. */
