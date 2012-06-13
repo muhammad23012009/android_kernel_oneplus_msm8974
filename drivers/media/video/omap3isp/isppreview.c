@@ -1883,9 +1883,18 @@ static int preview_set_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
 	if (prev->state != ISP_PIPELINE_STREAM_STOPPED)
 		return -EBUSY;
 
-	format = __preview_get_format(prev, fh, PREV_PAD_SINK, crop->which);
-	preview_try_crop(prev, format, &crop->rect);
-	*__preview_get_crop(prev, fh, crop->which) = crop->rect;
+	/* Modifying the crop rectangle always changes the format on the source
+	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
+	 * rectangle.
+	 */
+	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
+		sel->r = *__preview_get_crop(prev, fh, sel->which);
+		return 0;
+	}
+
+	format = __preview_get_format(prev, fh, PREV_PAD_SINK, sel->which);
+	preview_try_crop(prev, format, &sel->r);
+	*__preview_get_crop(prev, fh, sel->which) = sel->r;
 
 	/* Update the source format. */
 	format = __preview_get_format(prev, fh, PREV_PAD_SOURCE, crop->which);
