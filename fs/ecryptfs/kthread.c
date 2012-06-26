@@ -27,7 +27,12 @@
 #include <linux/mount.h>
 #include "ecryptfs_kernel.h"
 
-struct kmem_cache *ecryptfs_open_req_cache;
+struct ecryptfs_open_req {
+	struct file **lower_file;
+	struct path path;
+	struct completion done;
+	struct list_head kthread_ctl_list;
+};
 
 static struct ecryptfs_kthread_ctl {
 #define ECRYPTFS_KTHREAD_ZOMBIE 0x00000001
@@ -69,16 +74,9 @@ static int ecryptfs_threadfn(void *ignored)
 					       kthread_ctl_list);
 			mutex_lock(&req->mux);
 			list_del(&req->kthread_ctl_list);
-			if (!(req->flags & ECRYPTFS_REQ_ZOMBIE)) {
-				dget(req->lower_dentry);
-				mntget(req->lower_mnt);
-				(*req->lower_file) = dentry_open(
-					req->lower_dentry, req->lower_mnt,
-					(O_RDWR | O_LARGEFILE), current_cred());
-				req->flags |= ECRYPTFS_REQ_PROCESSED;
-			}
-			wake_up(&req->wait);
-			mutex_unlock(&req->mux);
+			*req->lower_file = dentry_open(&req->path,
+				(O_RDWR | O_LARGEFILE), current_cred());
+			complete(&req->done);
 		}
 		mutex_unlock(&ecryptfs_kthread_ctl.mux);
 	}
@@ -140,30 +138,22 @@ int ecryptfs_privileged_open(struct file **lower_file,
 	int flags = O_LARGEFILE;
 	int rc = 0;
 
+	init_completion(&req.done);
+	req.lower_file = lower_file;
+	req.path.dentry = lower_dentry;
+	req.path.mnt = lower_mnt;
+
 	/* Corresponding dput() and mntput() are done when the
 	 * lower file is fput() when all eCryptfs files for the inode are
 	 * released. */
-	dget(lower_dentry);
-	mntget(lower_mnt);
 	flags |= IS_RDONLY(lower_dentry->d_inode) ? O_RDONLY : O_RDWR;
-	(*lower_file) = dentry_open(lower_dentry, lower_mnt, flags, cred);
+	(*lower_file) = dentry_open(&req.path, flags, cred);
 	if (!IS_ERR(*lower_file))
 		goto out;
 	if ((flags & O_ACCMODE) == O_RDONLY) {
 		rc = PTR_ERR((*lower_file));
 		goto out;
 	}
-	req = kmem_cache_alloc(ecryptfs_open_req_cache, GFP_KERNEL);
-	if (!req) {
-		rc = -ENOMEM;
-		goto out;
-	}
-	mutex_init(&req->mux);
-	req->lower_file = lower_file;
-	req->lower_dentry = lower_dentry;
-	req->lower_mnt = lower_mnt;
-	init_waitqueue_head(&req->wait);
-	req->flags = 0;
 	mutex_lock(&ecryptfs_kthread_ctl.mux);
 	if (ecryptfs_kthread_ctl.flags & ECRYPTFS_KTHREAD_ZOMBIE) {
 		rc = -EIO;
