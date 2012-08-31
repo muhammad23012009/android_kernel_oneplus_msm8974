@@ -40,6 +40,17 @@ static inline unsigned int tcp_optlen(const struct sk_buff *skb)
 	return (tcp_hdr(skb)->doff - 5) * 4;
 }
 
+/* TCP Fast Open */
+#define TCP_FASTOPEN_COOKIE_MIN	4	/* Min Fast Open Cookie size in bytes */
+#define TCP_FASTOPEN_COOKIE_MAX	16	/* Max Fast Open Cookie size in bytes */
+#define TCP_FASTOPEN_COOKIE_SIZE 8	/* the size employed by this impl. */
+
+/* TCP Fast Open Cookie as stored in memory */
+struct tcp_fastopen_cookie {
+	s8	len;
+	u8	val[TCP_FASTOPEN_COOKIE_MAX];
+};
+
 /* This defines a selective acknowledgement block. */
 struct tcp_sack_block_wire {
 	__be32	start_seq;
@@ -99,9 +110,14 @@ struct tcp_request_sock {
 	/* Only used by TCP MD5 Signature so far. */
 	const struct tcp_request_sock_ops *af_specific;
 #endif
+	struct sock			*listener; /* needed for TFO */
 	u32				rcv_isn;
 	u32				snt_isn;
 	u32				snt_synack; /* synack sent time */
+	u32				rcv_nxt; /* the ack # by SYNACK. For
+						  * FastOpen it's the seq#
+						  * after data-in-SYN.
+						  */
 };
 
 static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)
@@ -302,6 +318,13 @@ struct tcp_sock {
 	 * contains related tcp_cookie_transactions fields.
 	 */
 	struct tcp_cookie_values  *cookie_values;
+
+/* TCP fastopen related information */
+	struct tcp_fastopen_request *fastopen_req;
+	/* fastopen_rsk points to request_sock that resulted in this big
+	 * socket. Used to retransmit SYNACKs etc.
+	 */
+	struct request_sock *fastopen_rsk;
 };
 
 enum tsq_flags {
