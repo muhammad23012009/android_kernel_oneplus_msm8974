@@ -1364,123 +1364,6 @@ enum nl80211_commands {
  * @NL80211_ATTR_SAE_DATA: SAE elements in Authentication frames. This starts
  *	with the Authentication transaction sequence number field.
  *
- * @NL80211_ATTR_VHT_CAPABILITY: VHT Capability information element (from
- *	association request when used with NL80211_CMD_NEW_STATION)
- *
- * @NL80211_ATTR_SCAN_FLAGS: scan request control flags (u32)
- *
- * @NL80211_ATTR_P2P_CTWINDOW: P2P GO Client Traffic Window (u8), used with
- *	the START_AP and SET_BSS commands
- * @NL80211_ATTR_P2P_OPPPS: P2P GO opportunistic PS (u8), used with the
- *	START_AP and SET_BSS commands. This can have the values 0 or 1;
- *	if not given in START_AP 0 is assumed, if not given in SET_BSS
- *	no change is made.
- *
- * @NL80211_ATTR_LOCAL_MESH_POWER_MODE: local mesh STA link-specific power mode
- *	defined in &enum nl80211_mesh_power_mode.
- *
- * @NL80211_ATTR_ACL_POLICY: ACL policy, see &enum nl80211_acl_policy,
- *	carried in a u32 attribute
- *
- * @NL80211_ATTR_MAC_ADDRS: Array of nested MAC addresses, used for
- *	MAC ACL.
- *
- * @NL80211_ATTR_MAC_ACL_MAX: u32 attribute to advertise the maximum
- *	number of MAC addresses that a device can support for MAC
- *	ACL.
- *
- * @NL80211_ATTR_RADAR_EVENT: Type of radar event for notification to userspace,
- *	contains a value of enum nl80211_radar_event (u32).
- *
- * @NL80211_ATTR_EXT_CAPA: 802.11 extended capabilities that the kernel driver
- *	has and handles. The format is the same as the IE contents. See
- *	802.11-2012 8.4.2.29 for more information.
- * @NL80211_ATTR_EXT_CAPA_MASK: Extended capabilities that the kernel driver
- *	has set in the %NL80211_ATTR_EXT_CAPA value, for multibit fields.
- *
- * @NL80211_ATTR_STA_CAPABILITY: Station capabilities (u16) are advertised to
- *	the driver, e.g., to enable TDLS power save (PU-APSD).
- *
- * @NL80211_ATTR_STA_EXT_CAPABILITY: Station extended capabilities are
- *	advertised to the driver, e.g., to enable TDLS off channel operations
- *	and PU-APSD.
- *
- * @NL80211_ATTR_PROTOCOL_FEATURES: global nl80211 feature flags, see
- *	&enum nl80211_protocol_features, the attribute is a u32.
- *
- * @NL80211_ATTR_SPLIT_WIPHY_DUMP: flag attribute, userspace supports
- *	receiving the data for a single wiphy split across multiple
- *	messages, given with wiphy dump message
- *
- * @NL80211_ATTR_MDID: Mobility Domain Identifier
- *
- * @NL80211_ATTR_IE_RIC: Resource Information Container Information
- *	Element
- *
- * @NL80211_ATTR_CRIT_PROT_ID: critical protocol identifier requiring increased
- *	reliability, see &enum nl80211_crit_proto_id (u16).
- * @NL80211_ATTR_MAX_CRIT_PROT_DURATION: duration in milliseconds in which
- *      the connection should have increased reliability (u16).
- *
- * @NL80211_ATTR_PEER_AID: Association ID for the peer TDLS station (u16).
- *	This is similar to @NL80211_ATTR_STA_AID but with a difference of being
- *	allowed to be used with the first @NL80211_CMD_SET_STATION command to
- *	update a TDLS peer STA entry.
- *
- * @NL80211_ATTR_COALESCE_RULE: Coalesce rule information.
- *
- * @NL80211_ATTR_CH_SWITCH_COUNT: u32 attribute specifying the number of TBTT's
- *	until the channel switch event.
- * @NL80211_ATTR_CH_SWITCH_BLOCK_TX: flag attribute specifying that transmission
- *	must be blocked on the current channel (before the channel switch
- *	operation).
- * @NL80211_ATTR_CSA_IES: Nested set of attributes containing the IE information
- *	for the time while performing a channel switch.
- * @NL80211_ATTR_CSA_C_OFF_BEACON: Offset of the channel switch counter
- *	field in the beacons tail (%NL80211_ATTR_BEACON_TAIL).
- * @NL80211_ATTR_CSA_C_OFF_PRESP: Offset of the channel switch counter
- *	field in the probe response (%NL80211_ATTR_PROBE_RESP).
- *
- * @NL80211_ATTR_RXMGMT_FLAGS: flags for nl80211_send_mgmt(), u32.
- *	As specified in the &enum nl80211_rxmgmt_flags.
- *
- * @NL80211_ATTR_STA_SUPPORTED_CHANNELS: array of supported channels.
- *
- * @NL80211_ATTR_STA_SUPPORTED_OPER_CLASSES: array of supported
- *      supported operating classes.
- *
- * @NL80211_ATTR_HANDLE_DFS: A flag indicating whether user space
- *	controls DFS operation in IBSS mode. If the flag is included in
- *	%NL80211_CMD_JOIN_IBSS request, the driver will allow use of DFS
- *	channels and reports radar events to userspace. Userspace is required
- *	to react to radar events, e.g. initiate a channel switch or leave the
- *	IBSS network.
- *
- * @NL80211_ATTR_VENDOR_ID: The vendor ID, either a 24-bit OUI or, if
- *	%NL80211_VENDOR_ID_IS_LINUX is set, a special Linux ID (not used yet)
- * @NL80211_ATTR_VENDOR_SUBCMD: vendor sub-command
- * @NL80211_ATTR_VENDOR_DATA: data for the vendor command, if any; this
- *	attribute is also used for vendor command feature advertisement
- * @NL80211_ATTR_VENDOR_EVENTS: used for event list advertising in the wiphy
- *	info, containing a nested array of possible events
- *
- * @NL80211_ATTR_QOS_MAP: IP DSCP mapping for Interworking QoS mapping. This
- *	data is in the format defined for the payload of the QoS Map Set element
- *	in IEEE Std 802.11-2012, 8.4.2.97.
- *
- * @NL80211_ATTR_MAC_HINT: MAC address recommendation as initial BSS
- * @NL80211_ATTR_WIPHY_FREQ_HINT: frequency of the recommended initial BSS
- *
- * @NL80211_ATTR_MAX_AP_ASSOC_STA: Device attribute that indicates how many
- *	associated stations are supported in AP mode (including P2P GO); u32.
- *	Since drivers may not have a fixed limit on the maximum number (e.g.,
- *	other concurrent operations may affect this), drivers are allowed to
- *	advertise values that cannot always be met. In such cases, an attempt
- *	to add a new station entry with @NL80211_CMD_NEW_STATION may fail.
- *
- * @NL80211_ATTR_TDLS_PEER_CAPABILITY: flags for TDLS peer capabilities, u32.
- *	As specified in the &enum nl80211_tdls_peer_capability.
- *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
  */
@@ -1739,83 +1622,6 @@ enum nl80211_attrs {
 	NL80211_ATTR_CONN_FAILED_REASON,
 
 	NL80211_ATTR_SAE_DATA,
-
-	NL80211_ATTR_VHT_CAPABILITY,
-
-	NL80211_ATTR_SCAN_FLAGS,
-
-	NL80211_ATTR_CHANNEL_WIDTH,
-	NL80211_ATTR_CENTER_FREQ1,
-	NL80211_ATTR_CENTER_FREQ2,
-
-	NL80211_ATTR_P2P_CTWINDOW,
-	NL80211_ATTR_P2P_OPPPS,
-
-	NL80211_ATTR_LOCAL_MESH_POWER_MODE,
-
-	NL80211_ATTR_ACL_POLICY,
-
-	NL80211_ATTR_MAC_ADDRS,
-
-	NL80211_ATTR_MAC_ACL_MAX,
-
-	NL80211_ATTR_RADAR_EVENT,
-
-	NL80211_ATTR_EXT_CAPA,
-	NL80211_ATTR_EXT_CAPA_MASK,
-
-	NL80211_ATTR_STA_CAPABILITY,
-	NL80211_ATTR_STA_EXT_CAPABILITY,
-
-	NL80211_ATTR_PROTOCOL_FEATURES,
-	NL80211_ATTR_SPLIT_WIPHY_DUMP,
-
-	NL80211_ATTR_DISABLE_VHT,
-	NL80211_ATTR_VHT_CAPABILITY_MASK,
-
-	NL80211_ATTR_MDID,
-	NL80211_ATTR_IE_RIC,
-
-	NL80211_ATTR_CRIT_PROT_ID,
-	NL80211_ATTR_MAX_CRIT_PROT_DURATION,
-
-	NL80211_ATTR_PEER_AID,
-
-	NL80211_ATTR_COALESCE_RULE,
-
-	NL80211_ATTR_CH_SWITCH_COUNT,
-	NL80211_ATTR_CH_SWITCH_BLOCK_TX,
-	NL80211_ATTR_CSA_IES,
-	NL80211_ATTR_CSA_C_OFF_BEACON,
-	NL80211_ATTR_CSA_C_OFF_PRESP,
-
-	NL80211_ATTR_RXMGMT_FLAGS,
-
-	NL80211_ATTR_STA_SUPPORTED_CHANNELS,
-
-	NL80211_ATTR_STA_SUPPORTED_OPER_CLASSES,
-
-	NL80211_ATTR_HANDLE_DFS,
-
-	NL80211_ATTR_SUPPORT_5_MHZ,
-	NL80211_ATTR_SUPPORT_10_MHZ,
-
-	NL80211_ATTR_OPMODE_NOTIF,
-
-	NL80211_ATTR_VENDOR_ID,
-	NL80211_ATTR_VENDOR_SUBCMD,
-	NL80211_ATTR_VENDOR_DATA,
-
-	NL80211_ATTR_VENDOR_EVENTS,
-
-	NL80211_ATTR_QOS_MAP,
-
-	NL80211_ATTR_MAC_HINT,
-	NL80211_ATTR_WIPHY_FREQ_HINT,
-
-	NL80211_ATTR_MAX_AP_ASSOC_STA,
-
-	NL80211_ATTR_TDLS_PEER_CAPABILITY,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -2721,6 +2527,7 @@ enum nl80211_bss_status {
  * @NL80211_AUTHTYPE_SHARED_KEY: Shared Key authentication (WEP only)
  * @NL80211_AUTHTYPE_FT: Fast BSS Transition (IEEE 802.11r)
  * @NL80211_AUTHTYPE_NETWORK_EAP: Network EAP (some Cisco APs and mainly LEAP)
+ * @NL80211_AUTHTYPE_SAE: Simultaneous authentication of equals
  * @__NL80211_AUTHTYPE_NUM: internal
  * @NL80211_AUTHTYPE_MAX: maximum valid auth algorithm
  * @NL80211_AUTHTYPE_AUTOMATIC: determine automatically (if necessary by
@@ -2732,6 +2539,7 @@ enum nl80211_auth_type {
 	NL80211_AUTHTYPE_SHARED_KEY,
 	NL80211_AUTHTYPE_FT,
 	NL80211_AUTHTYPE_NETWORK_EAP,
+	NL80211_AUTHTYPE_SAE,
 
 	/* keep last */
 	__NL80211_AUTHTYPE_NUM,
@@ -3227,11 +3035,25 @@ enum nl80211_ap_sme_features {
  * @NL80211_FEATURE_HT_IBSS: This driver supports IBSS with HT datarates.
  * @NL80211_FEATURE_INACTIVITY_TIMER: This driver takes care of freeing up
  *	the connected inactive stations in AP mode.
+ * @NL80211_FEATURE_CELL_BASE_REG_HINTS: This driver has been tested
+ *	to work properly to suppport receiving regulatory hints from
+ *	cellular base stations.
+ * @NL80211_FEATURE_P2P_DEVICE_NEEDS_CHANNEL: If this is set, an active
+ *	P2P Device (%NL80211_IFTYPE_P2P_DEVICE) requires its own channel
+ *	in the interface combinations, even when it's only used for scan
+ *	and remain-on-channel. This could be due to, for example, the
+ *	remain-on-channel implementation requiring a channel context.
+ * @NL80211_FEATURE_SAE: This driver supports simultaneous authentication of
+ *	equals (SAE) with user space SME (NL80211_CMD_AUTHENTICATE) in station
+ *	mode
  */
 enum nl80211_feature_flags {
-	NL80211_FEATURE_SK_TX_STATUS	= 1 << 0,
-	NL80211_FEATURE_HT_IBSS		= 1 << 1,
-	NL80211_FEATURE_INACTIVITY_TIMER = 1 << 2,
+	NL80211_FEATURE_SK_TX_STATUS			= 1 << 0,
+	NL80211_FEATURE_HT_IBSS				= 1 << 1,
+	NL80211_FEATURE_INACTIVITY_TIMER		= 1 << 2,
+	NL80211_FEATURE_CELL_BASE_REG_HINTS		= 1 << 3,
+	NL80211_FEATURE_P2P_DEVICE_NEEDS_CHANNEL	= 1 << 4,
+	NL80211_FEATURE_SAE				= 1 << 5,
 };
 
 /**
