@@ -25,6 +25,7 @@
 #include <linux/iommu.h>
 #include <linux/platform_device.h>
 #include <media/v4l2-fh.h>
+#include <media/v4l2-ioctl.h>
 #include "msm.h"
 #include "msm_vb2.h"
 #include "msm_sd.h"

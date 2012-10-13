@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <mach/board.h>
 
+#include <linux/v4l2-controls.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>

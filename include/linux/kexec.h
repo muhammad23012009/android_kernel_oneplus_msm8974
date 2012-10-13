@@ -1,6 +1,8 @@
 #ifndef LINUX_KEXEC_H
 #define LINUX_KEXEC_H
 
+#include <uapi/linux/kexec.h>
+
 #ifdef CONFIG_KEXEC
 #include <linux/types.h>
 #include <linux/list.h>

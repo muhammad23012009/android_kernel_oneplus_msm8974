@@ -269,34 +269,4 @@ bitmap_bytes(u32 a, u32 b)
 	return 4 * ((((b - a + 8) / 8) + 3) / 4);
 }
 
-<<<<<<< HEAD
-#endif /* __KERNEL__ */
-
-/* Interface to iptables/ip6tables */
-
-#define SO_IP_SET		83
-
-union ip_set_name_index {
-	char name[IPSET_MAXNAMELEN];
-	ip_set_id_t index;
-};
-
-#define IP_SET_OP_GET_BYNAME	0x00000006	/* Get set index by name */
-struct ip_set_req_get_set {
-	unsigned op;
-	unsigned version;
-	union ip_set_name_index set;
-};
-
-#define IP_SET_OP_GET_BYINDEX	0x00000007	/* Get set name by index */
-/* Uses ip_set_req_get_set */
-
-#define IP_SET_OP_VERSION	0x00000100	/* Ask kernel version */
-struct ip_set_req_version {
-	unsigned op;
-	unsigned version;
-};
-
-=======
->>>>>>> a82014149bec (UAPI: (Scripted) Disintegrate include/linux/netfilter/ipset)
 #endif /*_IP_SET_H */
