@@ -86,19 +86,13 @@ struct aa_perms {
 	/* Reserved:
 	 * u32 subtree;	/ * set only when allow is set * /
 	 */
+	u16 xindex;
 };
 
 #define ALL_PERMS_MASK 0xffffffff
+extern struct aa_perms nullperms;
+extern struct aa_perms allperms;
 
-#define aa_perms_clear(X) memset((X), 0, sizeof(*(X)));
-#define aa_perms_all(X)						\
-	do {							\
-		aa_perms_clear(X);				\
-		(X)->allow = ALL_PERMS_MASK;			\
-		/* the following are only used for denials */	\
-		(X)->quiet = ALL_PERMS_MASK;			\
-		(X)->hide = ALL_PERMS_MASK;			\
-	} while (0)
 
 #define xcheck(FN1, FN2)	\
 ({				\
@@ -110,14 +104,24 @@ struct aa_perms {
 })
 
 
-/* TODO: update for labels pointing to labels instead of profiles
-*  Note: this only works for profiles from a single namespace
-*/
+/*
+ * TODO: update for labels pointing to labels instead of profiles
+ * TODO: optimize the walk, currently does subwalk of L2 for each P in L1
+ * gah this doesn't allow for label compound check!!!!
+ */
+#define xcheck_ns_profile_profile(P1, P2, FN, args...)		\
+({								\
+	int ____e = 0;						\
+	if (P1->ns == P2->ns)					\
+		____e = FN((P1), (P2), args);			\
+	(____e);						\
+})
 
-#define xcheck_profile_label(P, L, FN, args...)			\
+#define xcheck_ns_profile_label(P, L, FN, args...)		\
 ({								\
 	struct aa_profile *__p2;				\
-	fn_for_each((L), __p2, FN((P), __p2, args));		\
+	fn_for_each((L), __p2,					\
+		    xcheck_ns_profile_profile((P), __p2, (FN), args));	\
 })
 
 #define xcheck_ns_labels(L1, L2, FN, args...)			\
@@ -126,13 +130,9 @@ struct aa_perms {
 	fn_for_each((L1), __p1, FN(__p1, (L2), args));		\
 })
 
-/* todo: fix to handle multiple namespaces */
-#define xcheck_labels(L1, L2, FN, args...)			\
-	xcheck_ns_labels((L1), (L2), FN, args)
-
 /* Do the cross check but applying FN at the profiles level */
 #define xcheck_labels_profiles(L1, L2, FN, args...)		\
-	xcheck_ns_labels((L1), (L2), xcheck_profile_label, (FN), args)
+	xcheck_ns_labels((L1), (L2), xcheck_ns_profile_label, (FN), args)
 
 
 #define FINAL_CHECK true
@@ -147,15 +147,14 @@ void aa_compute_perms(struct aa_dfa *dfa, unsigned int state,
 		      struct aa_perms *perms);
 void aa_perms_accum(struct aa_perms *accum, struct aa_perms *addend);
 void aa_perms_accum_raw(struct aa_perms *accum, struct aa_perms *addend);
-void aa_profile_match_label(struct aa_profile *profile, const char *label,
-			    int type, struct aa_perms *perms);
+void aa_profile_match_label(struct aa_profile *profile, struct aa_label *label,
+			    int type, u32 request, struct aa_perms *perms);
 int aa_profile_label_perm(struct aa_profile *profile, struct aa_profile *target,
 			  u32 request, int type, u32 *deny,
 			  struct common_audit_data *sa);
 int aa_check_perms(struct aa_profile *profile, struct aa_perms *perms,
 		   u32 request, struct common_audit_data *sa,
 		   void (*cb) (struct audit_buffer *, void *));
-const char *aa_peer_name(struct aa_profile *peer);
 
 
 static inline int aa_xlabel_perm(struct aa_profile *profile,

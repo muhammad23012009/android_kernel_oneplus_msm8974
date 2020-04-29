@@ -27,7 +27,7 @@ enum path_flags {
 	PATH_MEDIATE_DELETED = 0x10000,	 /* mediate deleted paths */
 };
 
-int aa_path_name(struct path *path, int flags, char *buffer,
+int aa_path_name(const struct path *path, int flags, char *buffer,
 		 const char **name, const char **info, const char *disconnect);
 
 #define MAX_PATH_BUFFERS 2
@@ -64,7 +64,7 @@ DECLARE_PER_CPU(struct aa_buffers, aa_buffers);
 #define __get_buffer(N) ({					\
 	struct aa_buffers *__cpu_var; \
 	AA_BUG_PREEMPT_ENABLED("__get_buffer without preempt disabled");  \
-	__cpu_var = &__get_cpu_var(aa_buffers);			\
+	__cpu_var = this_cpu_ptr(&aa_buffers);			\
         __cpu_var->buf[(N)]; })
 
 #define __get_buffers(X...)		\

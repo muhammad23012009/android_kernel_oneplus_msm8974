@@ -49,8 +49,8 @@ static int prepend(char **buffer, int buflen, const char *str, int namelen)
  *     of chroot) and specifically directed to connect paths to
  *     namespace root.
  */
-static int disconnect(struct path *path, char *buf, char **name, int flags,
-		      const char *disconnected)
+static int disconnect(const struct path *path, char *buf, char **name,
+		      int flags, const char *disconnected)
 {
 	int error = 0;
 
@@ -89,7 +89,7 @@ static int disconnect(struct path *path, char *buf, char **name, int flags,
  *          When no error the path name is returned in @name which points to
  *          to a position in @buf
  */
-static int d_namespace_path(struct path *path, char *buf, char **name,
+static int d_namespace_path(const struct path *path, char *buf, char **name,
 			    int flags, const char *disconnected)
 {
 	char *res;
@@ -152,20 +152,20 @@ static int d_namespace_path(struct path *path, char *buf, char **name,
 
 	*name = res;
 
+	if (!connected)
+		error = disconnect(path, buf, name, flags, disconnected);
+
 	/* Handle two cases:
 	 * 1. A deleted dentry && profile is not allowing mediation of deleted
 	 * 2. On some filesystems, newly allocated dentries appear to the
 	 *    security_path hooks as a deleted dentry except without an inode
 	 *    allocated.
 	 */
-	if (d_unlinked(path->dentry) && path->dentry->d_inode &&
-	    !(flags & PATH_MEDIATE_DELETED)) {
+	if (d_unlinked(path->dentry) && d_is_positive(path->dentry) &&
+	    !(flags & (PATH_MEDIATE_DELETED | PATH_DELEGATE_DELETED))) {
 			error = -ENOENT;
 			goto out;
 	}
-
-	if (!connected)
-		error = disconnect(path, buf, name, flags, disconnected);
 
 out:
 	/*
@@ -198,8 +198,8 @@ out:
  *
  * Returns: %0 else error code if could retrieve name
  */
-int aa_path_name(struct path *path, int flags, char *buffer, const char **name,
-		 const char **info, const char *disconnected)
+int aa_path_name(const struct path *path, int flags, char *buffer,
+		 const char **name, const char **info, const char *disconnected)
 {
 	char *str = NULL;
 	int error = d_namespace_path(path, buffer, &str, flags, disconnected);
