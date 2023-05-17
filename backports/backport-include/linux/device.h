@@ -88,23 +88,6 @@ do {									\
 #define dev_info_ratelimited(dev, fmt, ...)				\
 	dev_level_ratelimited(dev_info, dev, fmt, ##__VA_ARGS__)
 
-
-#if defined(CONFIG_DYNAMIC_DEBUG) || defined(DEBUG)
-#define dev_dbg_ratelimited(dev, fmt, ...)				\
-do {									\
-	static DEFINE_RATELIMIT_STATE(_rs,				\
-				      DEFAULT_RATELIMIT_INTERVAL,	\
-				      DEFAULT_RATELIMIT_BURST);		\
-	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);			\
-	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_PRINT) &&	\
-	    __ratelimit(&_rs))						\
-		__dynamic_pr_debug(&descriptor, pr_fmt(fmt),		\
-				   ##__VA_ARGS__);			\
-} while (0)
-#else
-#define dev_dbg_ratelimited(dev, fmt, ...)			\
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
-#endif /* dynamic debug */
 #endif /* <= 3.5 */
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,6,0)
