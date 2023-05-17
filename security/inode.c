@@ -139,7 +139,7 @@ struct dentry *securityfs_create_dentry(const char *name, umode_t mode,
 	if (!parent)
 		parent = mount->mnt_root;
 
-	dir = d_inode(parent);
+	dir = parent->d_inode;
 
 	inode_lock(dir);
 	dentry = lookup_one_len(name, parent, strlen(name));

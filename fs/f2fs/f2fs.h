@@ -168,16 +168,6 @@ static inline bool f2fs_crc_valid(__u32 blk_crc, void *buf, size_t buf_size)
 	return f2fs_crc32(buf, buf_size) == blk_crc;
 }
 
-static inline void inode_lock(struct inode *inode)
-{
-	mutex_lock(&inode->i_mutex);
-}
-
-static inline void inode_unlock(struct inode *inode)
-{
-	mutex_unlock(&inode->i_mutex);
-}
-
 /**
  * wq_has_sleeper - check if there are any waiting processes
  * @wq: wait queue head
@@ -197,11 +187,6 @@ static inline bool wq_has_sleeper(wait_queue_head_t *wq)
 	 */
 	smp_mb();
 	return waitqueue_active(wq);
-}
-
-static inline struct inode *d_inode(const struct dentry *dentry)
-{
-	return dentry->d_inode;
 }
 
 static inline struct dentry *file_dentry(const struct file *file)

@@ -296,11 +296,6 @@ static inline u64 autofs4_get_ino(struct autofs_sb_info *sbi)
 	return sbi->sb->s_root->d_inode->i_ino;
 }
 
-static inline int simple_positive(struct dentry *dentry)
-{
-	return dentry->d_inode && !d_unhashed(dentry);
-}
-
 static inline void __autofs4_add_expiring(struct dentry *dentry)
 {
 	struct autofs_sb_info *sbi = autofs4_sbi(dentry->d_sb);

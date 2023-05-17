@@ -211,6 +211,20 @@ struct dentry_operations {
 
 #define DCACHE_ENCRYPTED_WITH_KEY	0x04000000 /* dir is encrypted with a valid key */
 
+#define DCACHE_ENTRY_TYPE		0x00700000
+#define DCACHE_MISS_TYPE		0x00000000 /* Negative dentry (maybe fallthru to nowhere) */
+#define DCACHE_WHITEOUT_TYPE		0x00100000 /* Whiteout dentry (stop pathwalk) */
+#define DCACHE_DIRECTORY_TYPE		0x00200000 /* Normal directory */
+#define DCACHE_AUTODIR_TYPE		0x00300000 /* Lookupless directory (presumed automount) */
+#define DCACHE_REGULAR_TYPE		0x00400000 /* Regular file type (or fallthru to such) */
+#define DCACHE_SPECIAL_TYPE		0x00500000 /* Other file type (or fallthru to such) */
+#define DCACHE_SYMLINK_TYPE		0x00600000 /* Symlink (or fallthru to such) */
+
+#define DCACHE_MAY_FREE			0x00800000
+#define DCACHE_FALLTHRU			0x01000000 /* Fall through to lower layer */
+#define DCACHE_OP_SELECT_INODE		0x02000000 /* Unioned entry: dcache op selects inode */
+#define DCACHE_OP_REAL			0x08000000
+
 extern seqlock_t rename_lock;
 
 static inline int dname_external(struct dentry *dentry)
@@ -413,6 +427,120 @@ static inline bool d_mountpoint(struct dentry *dentry)
 	return dentry->d_flags & DCACHE_MOUNTED;
 }
 
+/*
+ * Directory cache entry type accessor functions.
+ */
+static inline unsigned __d_entry_type(const struct dentry *dentry)
+{
+	return dentry->d_flags & DCACHE_ENTRY_TYPE;
+}
+
+static inline bool d_is_miss(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_MISS_TYPE;
+}
+
+static inline bool d_is_whiteout(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_WHITEOUT_TYPE;
+}
+
+static inline bool d_can_lookup(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_DIRECTORY_TYPE;
+}
+
+static inline bool d_is_autodir(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_AUTODIR_TYPE;
+}
+
+static inline bool d_is_dir(const struct dentry *dentry)
+{
+	return d_can_lookup(dentry) || d_is_autodir(dentry);
+}
+
+static inline bool d_is_symlink(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_SYMLINK_TYPE;
+}
+
+static inline bool d_is_reg(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_REGULAR_TYPE;
+}
+
+static inline bool d_is_special(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_SPECIAL_TYPE;
+}
+
+static inline bool d_is_file(const struct dentry *dentry)
+{
+	return d_is_reg(dentry) || d_is_special(dentry);
+}
+
+static inline bool d_is_negative(const struct dentry *dentry)
+{
+	// TODO: check d_is_whiteout(dentry) also.
+	return d_is_miss(dentry);
+}
+
+static inline bool d_is_positive(const struct dentry *dentry)
+{
+	return !d_is_negative(dentry);
+}
+
+/**
+ * d_really_is_negative - Determine if a dentry is really negative (ignoring fallthroughs)
+ * @dentry: The dentry in question
+ *
+ * Returns true if the dentry represents either an absent name or a name that
+ * doesn't map to an inode (ie. ->d_inode is NULL).  The dentry could represent
+ * a true miss, a whiteout that isn't represented by a 0,0 chardev or a
+ * fallthrough marker in an opaque directory.
+ *
+ * Note!  (1) This should be used *only* by a filesystem to examine its own
+ * dentries.  It should not be used to look at some other filesystem's
+ * dentries.  (2) It should also be used in combination with d_inode() to get
+ * the inode.  (3) The dentry may have something attached to ->d_lower and the
+ * type field of the flags may be set to something other than miss or whiteout.
+ */
+static inline bool d_really_is_negative(const struct dentry *dentry)
+{
+	return dentry->d_inode == NULL;
+}
+
+/**
+ * d_really_is_positive - Determine if a dentry is really positive (ignoring fallthroughs)
+ * @dentry: The dentry in question
+ *
+ * Returns true if the dentry represents a name that maps to an inode
+ * (ie. ->d_inode is not NULL).  The dentry might still represent a whiteout if
+ * that is represented on medium as a 0,0 chardev.
+ *
+ * Note!  (1) This should be used *only* by a filesystem to examine its own
+ * dentries.  It should not be used to look at some other filesystem's
+ * dentries.  (2) It should also be used in combination with d_inode() to get
+ * the inode.
+ */
+static inline bool d_really_is_positive(const struct dentry *dentry)
+{
+	return dentry->d_inode != NULL;
+}
+
+static inline int simple_positive(struct dentry *dentry)
+{
+	return d_really_is_positive(dentry) && !d_unhashed(dentry);
+}
+
+extern void d_set_fallthru(struct dentry *dentry);
+
+static inline bool d_is_fallthru(const struct dentry *dentry)
+{
+	return dentry->d_flags & DCACHE_FALLTHRU;
+}
+
 static inline bool d_need_lookup(struct dentry *dentry)
 {
 	return dentry->d_flags & DCACHE_NEED_LOOKUP;
@@ -428,6 +556,18 @@ static inline bool d_is_su(const struct dentry *dentry)
 }
 
 extern int sysctl_vfs_cache_pressure;
+
+/**
+ * d_inode - Get the actual inode of this dentry
+ * @dentry: The dentry to query
+ *
+ * This is the helper normal filesystems should use to get at their own inodes
+ * in their own dentries and ignore the layering superimposed upon them.
+ */
+static inline struct inode *d_inode(const struct dentry *dentry)
+{
+	return dentry->d_inode;
+}
 
 struct name_snapshot {
 	const char *name;
