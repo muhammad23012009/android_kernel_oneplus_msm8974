@@ -37,6 +37,8 @@ hci_uart-$(CONFIG_BACKPORT_BT_HCIUART_INTEL)	+= hci_intel.o
 hci_uart-$(CONFIG_BACKPORT_BT_HCIUART_BCM)	+= hci_bcm.o
 hci_uart-objs				:= $(hci_uart-y)
 
-obj-$(CONFIG_MSM_BT_POWER)              += bluetooth-power.o
+obj-$(CONFIG_BACKPORT_BT_MSM_SLEEP)              += msm_bt_sleep.o
+msm_bt_sleep-objs                       := bluesleep.o
+obj-$(CONFIG_BACKPORT_MSM_BT_POWER)              += bluetooth-power.o
 
 ccflags-y += -D__CHECK_ENDIAN__
