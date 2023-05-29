@@ -13,7 +13,6 @@
  */
 
 #include <linux/errno.h>
-//#include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/mount.h>
 #include <linux/syscalls.h>
