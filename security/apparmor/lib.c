@@ -155,9 +155,6 @@ void *__aa_kvmalloc(size_t size, gfp_t flags)
 	return buffer;
 }
 
-
-
-
 __counted char *aa_str_alloc(int size, gfp_t gfp)
 {
 	struct counted_str *str;

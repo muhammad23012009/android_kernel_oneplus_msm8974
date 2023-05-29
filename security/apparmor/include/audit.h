@@ -21,7 +21,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 
-#include "backport.h"
 #include "file.h"
 #include "label.h"
 

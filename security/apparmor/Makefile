@@ -4,7 +4,7 @@ obj-$(CONFIG_SECURITY_APPARMOR) += apparmor.o
 
 apparmor-y := apparmorfs.o audit.o capability.o context.o ipc.o lib.o match.o \
               path.o domain.o policy.o policy_unpack.o procattr.o lsm.o \
-              resource.o sid.o file.o label.o mount.o net.o af_unix.o backport.o
+              resource.o sid.o file.o label.o mount.o net.o af_unix.o
 apparmor-$(CONFIG_SECURITY_APPARMOR_HASH) += crypto.o
 
 clean-files := capability_names.h rlim_names.h net_names.h
@@ -103,9 +103,7 @@ $(obj)/rlim_names.h : $(srctree)/include/uapi/asm-generic/resource.h \
 		      $(src)/Makefile
 	$(call cmd,make-rlim)
 $(obj)/net_names.h : $(srctree)/include/linux/socket.h \
-                     $(srctree)/include/uapi/linux/socket.h \
-                     $(srctree)/include/linux/net.h \
-		     $(srctree)/include/uapi/linux/net.h \
+		     $(srctree)/include/linux/net.h \
 		     $(src)/Makefile
 	$(call cmd,make-af)
 	$(call cmd,make-sock)

@@ -4269,7 +4269,7 @@ kgsl_get_unmapped_area(struct file *file, unsigned long addr,
 			break;
 		} else {
 			unsigned long temp = ret;
-			ret = security_file_mmap(NULL, 0, 0, 0, ret, 1);
+			ret = security_mmap_addr(ret);
 			if (ret) {
 				retry = 1;
 				continue;

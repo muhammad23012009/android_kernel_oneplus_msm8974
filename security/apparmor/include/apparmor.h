@@ -18,7 +18,6 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 
-#include "backport.h"
 #include "match.h"
 
 /* Provide our own test for whether a write lock is held for asserts
@@ -53,6 +52,7 @@
 extern enum audit_mode aa_g_audit;
 extern bool aa_g_audit_header;
 extern bool aa_g_debug;
+extern bool aa_g_hash_policy;
 extern bool aa_g_lock_policy;
 extern bool aa_g_logsyscall;
 extern bool aa_g_paranoid_load;
@@ -90,7 +90,6 @@ char *aa_split_fqname(char *args, char **ns_name);
 char *aa_splitn_fqname(char *fqname, size_t n, char **ns_name, size_t *ns_len);
 void aa_info_message(const char *str);
 void *__aa_kvmalloc(size_t size, gfp_t flags);
-
 
 static inline void *kvmalloc(size_t size)
 {
@@ -137,9 +136,9 @@ static inline unsigned int aa_dfa_null_transition(struct aa_dfa *dfa,
 	return aa_dfa_next(dfa, start, 0);
 }
 
-static inline bool path_mediated_fs(struct inode *inode)
+static inline bool path_mediated_fs(struct dentry *dentry)
 {
-	return !(inode->i_sb->s_flags & MS_NOUSER);
+	return !(dentry->d_sb->s_flags & MS_NOUSER);
 }
 
 
