@@ -149,7 +149,7 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 
 	if (!ret) {
 		trace_cpu_frequency_switch_end(policy->cpu);
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 	}
 
 	/* Restore priority after clock ramp-up */
