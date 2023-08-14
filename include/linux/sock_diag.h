@@ -26,4 +26,6 @@ int sock_diag_put_meminfo(struct sock *sk, struct sk_buff *skb, int attr);
 
 extern struct sock *sock_diag_nlsk;
 
+int sock_diag_destroy(struct sock *sk, int err);
+
 #endif

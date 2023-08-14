@@ -17,7 +17,6 @@
 	compatible = "qcom,msmsamarium";
 	interrupt-parent = <&intc>;
 	soc: soc { };
-
 };
 
 /include/ "msmsamarium-ion.dtsi"
