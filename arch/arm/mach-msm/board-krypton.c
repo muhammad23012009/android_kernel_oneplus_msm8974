@@ -34,6 +34,22 @@
 #include "devices.h"
 #include "modem_notifier.h"
 
+static struct memtype_reserve msmkrypton_reserve_table[] __initdata = {
+	[MEMTYPE_EBI1] = {
+		.flags = MEMTYPE_FLAGS_1M_ALIGN,
+	},
+};
+
+static int msmkrypton_paddr_to_memtype(unsigned int paddr)
+{
+	return MEMTYPE_EBI1;
+}
+
+static struct reserve_info msmkrypton_reserve_info __initdata = {
+	.memtype_reserve_table = msmkrypton_reserve_table,
+	.paddr_to_memtype = msmkrypton_paddr_to_memtype,
+};
+
 static struct of_dev_auxdata msmkrypton_auxdata_lookup[] __initdata = {
 	{}
 };
@@ -46,19 +62,17 @@ static struct of_dev_auxdata msmkrypton_auxdata_lookup[] __initdata = {
  */
 void __init msmkrypton_add_drivers(void)
 {
+	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_rpm_driver_init();
 	msm_clock_init(&msmkrypton_clock_init_data);
 }
 
-void __init msmkrypton_reserve(void)
-{
-	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
-}
 static void __init msmkrypton_early_memory(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_hole, NULL);
+	reserve_info = &msmkrypton_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_hole, msmkrypton_reserve_table);
 }
 static void __init msmkrypton_map_io(void)
 {
@@ -67,19 +81,11 @@ static void __init msmkrypton_map_io(void)
 
 void __init msmkrypton_init(void)
 {
-	/*
-	 * populate devices from DT first so smem probe will get called as part
-	 * of msm_smem_init.  socinfo_init needs smem support so call
-	 * msm_smem_init before it.
-	 */
-	board_dt_populate(msmkrypton_auxdata_lookup);
-
-	msm_smem_init();
-
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	msmkrypton_init_gpiomux();
+	board_dt_populate(msmkrypton_auxdata_lookup);
 	msmkrypton_add_drivers();
 }
 

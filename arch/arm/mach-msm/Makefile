@@ -31,14 +31,13 @@ obj-$(CONFIG_ARCH_MSM_SCORPIONMP) += perf_event_msm_l2.o
 ifndef CONFIG_OF
 obj-$(CONFIG_HW_PERF_EVENTS) += pmu.o
 endif
-obj-$(CONFIG_ARCH_MSM_KRAIT) += msm-krait-l2-accessors.o
+obj-$(CONFIG_ARCH_MSM_KRAIT) += msm-krait-l2-accessors.o perf_event_msm_krait_l2.o
 obj-$(CONFIG_ARCH_MSM_KRAIT) += krait-scm.o
 ifdef CONFIG_HW_PERF_EVENTS
 obj-$(CONFIG_ARCH_MSM7X27A) += perf_event_msm_pl310.o
 obj-$(CONFIG_ARCH_MSM9625) += perf_event_msm_pl310.o
 obj-$(CONFIG_ARCH_MSM8625) += perf_event_msm_pl310.o
 obj-$(CONFIG_ARCH_MSM9615) += perf_event_msm_pl310.o
-obj-$(CONFIG_ARCH_MSM_KRAIT) += perf_event_msm_krait_l2.o
 obj-$(CONFIG_DEBUG_FS) += perf_debug.o
 endif
 
@@ -274,9 +273,7 @@ obj-$(CONFIG_ARCH_MSM9615) += board-9615.o devices-9615.o board-9615-regulator.o
 obj-$(CONFIG_ARCH_MSM9615) += clock-local.o clock-9615.o acpuclock-9615.o clock-rpm.o clock-pll.o
 obj-$(CONFIG_ARCH_APQ8084) += board-8084.o board-8084-gpiomux.o
 obj-$(CONFIG_ARCH_APQ8084) += clock-8084.o
-ifndef CONFIG_MACH_OPPO
 obj-$(CONFIG_ARCH_MSM8974) += board-8974.o board-8974-gpiomux.o
-endif
 obj-$(CONFIG_ARCH_MSM8974) += clock-krait-8974.o
 obj-$(CONFIG_ARCH_MSM8974) += clock-local2.o clock-pll.o clock-8974.o clock-rpm.o clock-voter.o clock-mdss-8974.o
 obj-$(CONFIG_ARCH_MSM8974) += gdsc.o
@@ -405,8 +402,6 @@ obj-$(CONFIG_MSM_USE_USER_ACCESSIBLE_TIMERS) += timer_page.o
 ifdef CONFIG_MSM_CPR
 obj-$(CONFIG_DEBUG_FS) += msm_cpr-debug.o
 endif
-
-obj-$(CONFIG_MACH_OPPO) += oppo/
 obj-$(CONFIG_MSM_FIQ) += msm7k_fiq.o
 obj-$(CONFIG_MSM_FIQ) += msm7k_fiq_handler.o
 
@@ -418,10 +413,11 @@ obj-$(CONFIG_MSM_CPU_PWRCTL) +=  msm_cpu_pwrctl.o
 obj-$(CONFIG_ARCH_MSM8974) += msm_mpmctr.o
 obj-$(CONFIG_MSM_CPR_REGULATOR) += cpr-regulator.o
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o
+obj-$(CONFIG_MSM_DEVFREQ_CPUBW) += devfreq_cpubw.o
 
 obj-$(CONFIG_WALL_CLK) += wallclk.o
 obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
-
-obj-$(CONFIG_HAS_MACH_MEMUTILS) += memutils/
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
 obj-$(CONFIG_PERFMAP) += perfmap.o
+
+obj-y += msm_ddr_sysctl.o

@@ -16,7 +16,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/clk.h>
-#include <linux/sched.h>
 #include <linux/clkdev.h>
 #include <linux/io.h>
 #include <linux/ktime.h>

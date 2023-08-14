@@ -38,6 +38,27 @@
 #include "platsmp.h"
 #include "modem_notifier.h"
 
+static struct memtype_reserve apq8084_reserve_table[] __initdata = {
+	[MEMTYPE_SMI] = {
+	},
+	[MEMTYPE_EBI0] = {
+		.flags  =       MEMTYPE_FLAGS_1M_ALIGN,
+	},
+	[MEMTYPE_EBI1] = {
+		.flags  =       MEMTYPE_FLAGS_1M_ALIGN,
+	},
+};
+
+static int apq8084_paddr_to_memtype(phys_addr_t paddr)
+{
+	return MEMTYPE_EBI1;
+}
+
+static struct reserve_info apq8084_reserve_info __initdata = {
+	.memtype_reserve_table = apq8084_reserve_table,
+	.paddr_to_memtype = apq8084_paddr_to_memtype,
+};
+
 static struct of_dev_auxdata apq8084_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("qcom,msm-sdcc", 0xF9824000, \
 			"msm_sdcc.1", NULL),
@@ -48,7 +69,15 @@ static struct of_dev_auxdata apq8084_auxdata_lookup[] __initdata = {
 
 void __init apq8084_reserve(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
+	reserve_info = &apq8084_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_reserve, apq8084_reserve_table);
+	msm_reserve();
+}
+
+static void __init apq8084_early_memory(void)
+{
+	reserve_info = &apq8084_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_hole, apq8084_reserve_table);
 }
 
 /*
@@ -59,6 +88,7 @@ void __init apq8084_reserve(void)
  */
 void __init apq8084_add_drivers(void)
 {
+	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_rpm_driver_init();
@@ -77,21 +107,17 @@ void __init apq8084_init(void)
 {
 	struct of_dev_auxdata *adata = apq8084_auxdata_lookup;
 
-	/*
-	 * populate devices from DT first so smem probe will get called as part
-	 * of msm_smem_init.  socinfo_init needs smem support so call
-	 * msm_smem_init before it.  apq8084_init_gpiomux needs socinfo so
-	 * call socinfo_init before it.
-	 */
-	board_dt_populate(adata);
-
-	msm_smem_init();
-
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	apq8084_init_gpiomux();
+	board_dt_populate(adata);
 	apq8084_add_drivers();
+}
+
+void __init apq8084_init_very_early(void)
+{
+	apq8084_early_memory();
 }
 
 static const char *apq8084_dt_match[] __initconst = {
@@ -107,6 +133,7 @@ DT_MACHINE_START(APQ8084_DT, "Qualcomm APQ 8084 (Flattened Device Tree)")
 	.timer = &msm_dt_timer,
 	.dt_compat = apq8084_dt_match,
 	.reserve = apq8084_reserve,
+	.init_very_early = apq8084_init_very_early,
 	.restart = msm_restart,
 	.smp = &msm8974_smp_ops,
 MACHINE_END

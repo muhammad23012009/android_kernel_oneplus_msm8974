@@ -39,6 +39,9 @@
 #include <mach/gpiomux.h>
 #include <mach/msm_iomap.h>
 #include <mach/restart.h>
+#ifdef CONFIG_ION_MSM
+#include <mach/ion.h>
+#endif
 #include <mach/msm_memtypes.h>
 #include <mach/socinfo.h>
 #include <mach/board.h>
@@ -56,12 +59,34 @@
 #include "modem_notifier.h"
 #include "spm-regulator.h"
 
+static struct memtype_reserve msm8226_reserve_table[] __initdata = {
+	[MEMTYPE_SMI] = {
+	},
+	[MEMTYPE_EBI0] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+	[MEMTYPE_EBI1] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+};
+
+static int msm8226_paddr_to_memtype(unsigned int paddr)
+{
+	return MEMTYPE_EBI1;
+}
+
 static struct of_dev_auxdata msm_hsic_host_adata[] = {
 	OF_DEV_AUXDATA("qcom,hsic-host", 0xF9A00000, "msm_hsic_host", NULL),
 	{}
 };
 
 static struct of_dev_auxdata msm8226_auxdata_lookup[] __initdata = {
+	OF_DEV_AUXDATA("qcom,msm-sdcc", 0xF9824000, \
+			"msm_sdcc.1", NULL),
+	OF_DEV_AUXDATA("qcom,msm-sdcc", 0xF98A4000, \
+			"msm_sdcc.2", NULL),
+	OF_DEV_AUXDATA("qcom,msm-sdcc", 0xF9864000, \
+			"msm_sdcc.3", NULL),
 	OF_DEV_AUXDATA("qcom,sdhci-msm", 0xF9824900, \
 			"msm_sdcc.1", NULL),
 	OF_DEV_AUXDATA("qcom,sdhci-msm", 0xF98A4900, \
@@ -75,9 +100,22 @@ static struct of_dev_auxdata msm8226_auxdata_lookup[] __initdata = {
 	{}
 };
 
+static struct reserve_info msm8226_reserve_info __initdata = {
+	.memtype_reserve_table = msm8226_reserve_table,
+	.paddr_to_memtype = msm8226_paddr_to_memtype,
+};
+
+static void __init msm8226_early_memory(void)
+{
+	reserve_info = &msm8226_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_hole, msm8226_reserve_table);
+}
+
 static void __init msm8226_reserve(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
+	reserve_info = &msm8226_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_reserve, msm8226_reserve_table);
+	msm_reserve();
 }
 
 /*
@@ -88,6 +126,7 @@ static void __init msm8226_reserve(void)
  */
 void __init msm8226_add_drivers(void)
 {
+	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_rpm_driver_init();
@@ -113,20 +152,11 @@ void __init msm8226_init(void)
 {
 	struct of_dev_auxdata *adata = msm8226_auxdata_lookup;
 
-	/*
-	 * populate devices from DT first so smem probe will get called as part
-	 * of msm_smem_init.  socinfo_init needs smem support so call
-	 * msm_smem_init before it.  msm8226_init_gpiomux needs socinfo so
-	 * call socinfo_init before it.
-	 */
-	board_dt_populate(adata);
-
-	msm_smem_init();
-
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	msm8226_init_gpiomux();
+	board_dt_populate(adata);
 	msm8226_add_drivers();
 }
 
@@ -145,6 +175,7 @@ DT_MACHINE_START(MSM8226_DT, "Qualcomm MSM 8x26 / MSM 8x28 (Flattened Device Tre
 	.timer = &msm_dt_timer,
 	.dt_compat = msm8226_dt_match,
 	.reserve = msm8226_reserve,
+	.init_very_early = msm8226_early_memory,
 	.restart = msm_restart,
 	.smp = &arm_smp_ops,
 MACHINE_END

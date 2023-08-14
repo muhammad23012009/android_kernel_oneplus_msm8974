@@ -68,9 +68,38 @@ static struct of_dev_auxdata msmsamarium_auxdata_lookup[] __initdata = {
 	{},
 };
 
+static struct memtype_reserve msmsamarium_reserve_table[] __initdata = {
+	[MEMTYPE_SMI] = {
+	},
+	[MEMTYPE_EBI0] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+	[MEMTYPE_EBI1] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+};
+
+static int msmsamarium_paddr_to_memtype(phys_addr_t paddr)
+{
+	return MEMTYPE_EBI1;
+}
+
+static struct reserve_info msmsamarium_reserve_info __initdata = {
+	.memtype_reserve_table = msmsamarium_reserve_table,
+	.paddr_to_memtype = msmsamarium_paddr_to_memtype,
+};
+
 void __init msmsamarium_reserve(void)
 {
-	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
+	reserve_info = &msmsamarium_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_reserve, msmsamarium_reserve_table);
+	msm_reserve();
+}
+
+static void __init msmsamarium_early_memory(void)
+{
+	reserve_info = &msmsamarium_reserve_info;
+	of_scan_flat_dt(dt_scan_for_memory_hole, msmsamarium_reserve_table);
 }
 
 /*
@@ -81,6 +110,7 @@ void __init msmsamarium_reserve(void)
  */
 void __init msmsamarium_add_drivers(void)
 {
+	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_clock_init(&msm_dummy_clock_init_data);
@@ -96,20 +126,17 @@ void __init msmsamarium_init(void)
 {
 	struct of_dev_auxdata *adata = msmsamarium_auxdata_lookup;
 
-	/*
-	 * populate devices from DT first so smem probe will get called as part
-	 * of msm_smem_init.  socinfo_init needs smem support so call
-	 * msm_smem_init before it.
-	 */
-	board_dt_populate(adata);
-
-	msm_smem_init();
-
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	msmsamarium_init_gpiomux();
+	board_dt_populate(adata);
 	msmsamarium_add_drivers();
+}
+
+void __init msmsamarium_init_very_early(void)
+{
+	msmsamarium_early_memory();
 }
 
 static const char *msmsamarium_dt_match[] __initconst = {
@@ -125,6 +152,7 @@ DT_MACHINE_START(MSMSAMARIUM_DT, "Qualcomm MSM Samarium(Flattened Device Tree)")
 	.timer = &msm_dt_timer,
 	.dt_compat = msmsamarium_dt_match,
 	.reserve = msmsamarium_reserve,
+	.init_very_early = msmsamarium_init_very_early,
 	.restart = msm_restart,
 	.smp = &msm8974_smp_ops,
 MACHINE_END
