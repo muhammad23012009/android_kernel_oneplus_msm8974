@@ -2239,6 +2239,11 @@ static int selinux_bprm_secureexec(struct linux_binprm *bprm)
 	return (atsecure || cap_bprm_secureexec(bprm));
 }
 
+static int match_file(const void *p, struct file *file, unsigned fd)
+{
+	return file_has_perm(p, file, file_to_av(file)) ? fd + 1 : 0;
+}
+
 /* Derived from fs/exec.c:flush_old_files. */
 static inline void flush_unauthorized_files(const struct cred *cred,
 					    struct files_struct *files)
@@ -2247,9 +2252,8 @@ static inline void flush_unauthorized_files(const struct cred *cred,
 	struct selinux_audit_data sad = {0,};
 	struct file *file, *devnull = NULL;
 	struct tty_struct *tty;
-	struct fdtable *fdt;
-	long j = -1;
 	int drop_tty = 0;
+	unsigned n;
 
 	tty = get_current_tty();
 	if (tty) {
@@ -2280,63 +2284,24 @@ static inline void flush_unauthorized_files(const struct cred *cred,
 		no_tty();
 
 	/* Revalidate access to inherited open files. */
+	n = iterate_fd(files, 0, match_file, cred);
+	if (!n) /* none found? */
+		return;
 
-	COMMON_AUDIT_DATA_INIT(&ad, INODE);
-	ad.selinux_audit_data = &sad;
-
-	spin_lock(&files->file_lock);
-	for (;;) {
-		unsigned long set, i;
-		int fd;
-
-		j++;
-		i = j * BITS_PER_LONG;
-		fdt = files_fdtable(files);
-		if (i >= fdt->max_fds)
-			break;
-		set = fdt->open_fds[j];
-		if (!set)
-			continue;
-		spin_unlock(&files->file_lock);
-		for ( ; set ; i++, set >>= 1) {
-			if (set & 1) {
-				file = fget(i);
-				if (!file)
-					continue;
-				if (file_has_perm(cred,
-						  file,
-						  file_to_av(file))) {
-					sys_close(i);
-					fd = get_unused_fd();
-					if (fd != i) {
-						if (fd >= 0)
-							put_unused_fd(fd);
-						fput(file);
-						continue;
-					}
-					if (devnull) {
-						get_file(devnull);
-					} else {
-						devnull = dentry_open(
-							dget(selinux_null),
-							mntget(selinuxfs_mount),
-							O_RDWR, cred);
-						if (IS_ERR(devnull)) {
-							devnull = NULL;
-							put_unused_fd(fd);
-							fput(file);
-							continue;
-						}
-					}
-					fd_install(fd, devnull);
-				}
-				fput(file);
-			}
-		}
-		spin_lock(&files->file_lock);
-
+	devnull = dentry_open(&selinux_null, O_RDWR, cred);
+	if (!IS_ERR(devnull)) {
+		/* replace all the matching ones with this */
+		do {
+			get_file(devnull);
+			replace_fd(n - 1, devnull, 0);
+		} while ((n = iterate_fd(files, n, match_file, cred)) != 0);
+		fput(devnull);
+	} else {
+		/* just close all the matching ones */
+		do {
+			replace_fd(n - 1, NULL, 0);
+		} while ((n = iterate_fd(files, n, match_file, cred)) != 0);
 	}
-	spin_unlock(&files->file_lock);
 }
 
 /*
@@ -3128,7 +3093,7 @@ static int selinux_file_permission(struct file *file, int mask)
 
 	if (sid == fsec->sid && fsec->isid == isec->sid &&
 	    fsec->pseqno == avc_policy_seqno())
-		/* No change since dentry_open check. */
+		/* No change since file_open check. */
 		return 0;
 
 	return selinux_revalidate_file_permission(file, mask);
@@ -3270,9 +3235,7 @@ error:
 	return rc;
 }
 
-static int selinux_file_mmap(struct file *file, unsigned long reqprot,
-			     unsigned long prot, unsigned long flags,
-			     unsigned long addr, unsigned long addr_only)
+static int selinux_mmap_addr(unsigned long addr)
 {
 	int rc = 0;
 	u32 sid = current_sid();
@@ -3291,10 +3254,12 @@ static int selinux_file_mmap(struct file *file, unsigned long reqprot,
 	}
 
 	/* do DAC check on address space usage */
-	rc = cap_file_mmap(file, reqprot, prot, flags, addr, addr_only);
-	if (rc || addr_only)
-		return rc;
+	return cap_mmap_addr(addr);
+}
 
+static int selinux_mmap_file(struct file *file, unsigned long reqprot,
+			     unsigned long prot, unsigned long flags)
+{
 	if (selinux_checkreqprot)
 		prot = reqprot;
 
@@ -3432,7 +3397,7 @@ static int selinux_file_receive(struct file *file)
 	return file_has_perm(cred, file, file_to_av(file));
 }
 
-static int selinux_dentry_open(struct file *file, const struct cred *cred)
+static int selinux_file_open(struct file *file, const struct cred *cred)
 {
 	struct file_security_struct *fsec;
 	struct inode *inode;
@@ -5930,7 +5895,8 @@ static struct security_operations selinux_ops = {
 	.file_alloc_security =		selinux_file_alloc_security,
 	.file_free_security =		selinux_file_free_security,
 	.file_ioctl =			selinux_file_ioctl,
-	.file_mmap =			selinux_file_mmap,
+	.mmap_file =			selinux_mmap_file,
+	.mmap_addr =			selinux_mmap_addr,
 	.file_mprotect =		selinux_file_mprotect,
 	.file_lock =			selinux_file_lock,
 	.file_fcntl =			selinux_file_fcntl,
@@ -5938,7 +5904,7 @@ static struct security_operations selinux_ops = {
 	.file_send_sigiotask =		selinux_file_send_sigiotask,
 	.file_receive =			selinux_file_receive,
 
-	.dentry_open =			selinux_dentry_open,
+	.file_open =			selinux_file_open,
 	.file_close =			selinux_file_close,
 	.allow_merge_bio =		selinux_allow_merge_bio,
 

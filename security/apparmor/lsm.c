@@ -272,7 +272,7 @@ static int common_perm_rm(int op, struct path *dir,
 	struct inode *inode = dentry->d_inode;
 	struct path_cond cond = { };
 
-	if (!inode || !dir->mnt || !path_mediated_fs(inode))
+	if (!inode || !dir->mnt || !path_mediated_fs(dentry))
 		return 0;
 
 	cond.uid = inode->i_uid;
@@ -296,7 +296,7 @@ static int common_perm_create(int op, struct path *dir, struct dentry *dentry,
 {
 	struct path_cond cond = { current_fsuid(), mode };
 
-	if (!dir->mnt || !path_mediated_fs(dir->dentry->d_inode))
+	if (!dir->mnt || !path_mediated_fs(dir->dentry))
 		return 0;
 
 	return common_perm_dir_dentry(op, dir, dentry, mask, &cond);
@@ -327,7 +327,7 @@ static int apparmor_path_mknod(struct path *dir, struct dentry *dentry,
 
 static int apparmor_path_truncate(struct path *path)
 {
-	if (!path->mnt || !path_mediated_fs(path->dentry->d_inode))
+	if (!path->mnt || !path_mediated_fs(path->dentry))
 		return 0;
 
 	return common_perm_cond(OP_TRUNC, path, MAY_WRITE | AA_MAY_SETATTR);
@@ -346,7 +346,7 @@ static int apparmor_path_link(struct dentry *old_dentry, struct path *new_dir,
 	struct aa_label *label;
 	int error = 0;
 
-	if (!path_mediated_fs(old_dentry->d_inode))
+	if (!path_mediated_fs(old_dentry))
 		return 0;
 
 	label = aa_current_label();
@@ -361,7 +361,7 @@ static int apparmor_path_rename(struct path *old_dir, struct dentry *old_dentry,
 	struct aa_label *label;
 	int error = 0;
 
-	if (!path_mediated_fs(old_dentry->d_inode))
+	if (!path_mediated_fs(old_dentry))
 		return 0;
 
 	label = aa_current_label();
@@ -387,7 +387,7 @@ static int apparmor_path_rename(struct path *old_dir, struct dentry *old_dentry,
 
 static int apparmor_path_chmod(struct path *path, umode_t mode)
 {
-	if (!path_mediated_fs(path->dentry->d_inode))
+	if (!path_mediated_fs(path->dentry))
 		return 0;
 
 	return common_perm_cond(OP_CHMOD, path, AA_MAY_CHMOD);
@@ -395,7 +395,7 @@ static int apparmor_path_chmod(struct path *path, umode_t mode)
 
 static int apparmor_path_chown(struct path *path, kuid_t uid, kgid_t gid)
 {
-	if (!path_mediated_fs(path->dentry->d_inode))
+	if (!path_mediated_fs(path->dentry))
 		return 0;
 
 	return common_perm_cond(OP_CHOWN, path, AA_MAY_CHOWN);
@@ -403,7 +403,7 @@ static int apparmor_path_chown(struct path *path, kuid_t uid, kgid_t gid)
 
 static int apparmor_inode_getattr(struct vfsmount *mnt, struct dentry *dentry)
 {
-	if (!path_mediated_fs(dentry->d_inode))
+	if (!path_mediated_fs(dentry))
 		return 0;
 
 	return common_perm_mnt_dentry(OP_GETATTR, mnt, dentry,
@@ -416,7 +416,7 @@ static int apparmor_file_open(struct file *file, const struct cred *cred)
 	struct aa_label *label;
 	int error = 0;
 
-	if (!path_mediated_fs(file_inode(file)))
+	if (!path_mediated_fs(file->f_path.dentry))
 		return 0;
 
 	/* If in exec, permission is handled by bprm hooks.
@@ -513,17 +513,9 @@ static int common_mmap(int op, struct file *file, unsigned long prot,
 	return common_file_perm(op, file, mask);
 }
 
-static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
-			      unsigned long prot, unsigned long flags,
-			      unsigned long addr, unsigned long addr_only)
+static int apparmor_mmap_file(struct file *file, unsigned long reqprot,
+			      unsigned long prot, unsigned long flags)
 {
-	int rc = 0;
-
-	/* do DAC check */
-	rc = cap_mmap_addr(addr);
-	if (rc || addr_only)
-		return rc;
-
 	return common_mmap(OP_FMMAP, file, prot, flags);
 }
 
@@ -1164,7 +1156,8 @@ static struct security_operations apparmor_ops = {
 	.file_permission =		apparmor_file_permission,
 	.file_alloc_security =		apparmor_file_alloc_security,
 	.file_free_security =		apparmor_file_free_security,
-	.file_mmap =			apparmor_file_mmap,
+	.mmap_file =			apparmor_mmap_file,
+	.mmap_addr =			cap_mmap_addr,
 	.file_mprotect =		apparmor_file_mprotect,
 	.file_lock =			apparmor_file_lock,
 
@@ -1218,6 +1211,7 @@ static int param_set_aabool(const char *val, const struct kernel_param *kp);
 static int param_get_aabool(char *buffer, const struct kernel_param *kp);
 #define param_check_aabool param_check_bool
 static struct kernel_param_ops param_ops_aabool = {
+	.flags = KERNEL_PARAM_OPS_FL_NOARG,
 	.set = param_set_aabool,
 	.get = param_get_aabool
 };
@@ -1234,6 +1228,7 @@ static int param_set_aalockpolicy(const char *val, const struct kernel_param *kp
 static int param_get_aalockpolicy(char *buffer, const struct kernel_param *kp);
 #define param_check_aalockpolicy param_check_bool
 static struct kernel_param_ops param_ops_aalockpolicy = {
+	.flags = KERNEL_PARAM_OPS_FL_NOARG,
 	.set = param_set_aalockpolicy,
 	.get = param_get_aalockpolicy
 };
@@ -1252,6 +1247,10 @@ static int param_get_mode(char *buffer, struct kernel_param *kp);
 enum profile_mode aa_g_profile_mode = APPARMOR_ENFORCE;
 module_param_call(mode, param_set_mode, param_get_mode,
 		  &aa_g_profile_mode, S_IRUSR | S_IWUSR);
+
+/* whether policy verification hashing is enabled */
+bool aa_g_hash_policy = CONFIG_SECURITY_APPARMOR_HASH_DEFAULT;
+module_param_named(hash_policy, aa_g_hash_policy, aabool, S_IRUSR | S_IWUSR);
 
 /* Debug mode */
 bool aa_g_debug;

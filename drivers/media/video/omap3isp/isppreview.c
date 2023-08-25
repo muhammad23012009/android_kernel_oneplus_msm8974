@@ -1838,7 +1838,26 @@ static int preview_get_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
 	if (crop->pad != PREV_PAD_SINK)
 		return -EINVAL;
 
-	crop->rect = *__preview_get_crop(prev, fh, crop->which);
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		sel->r.left = 0;
+		sel->r.top = 0;
+		sel->r.width = INT_MAX;
+		sel->r.height = INT_MAX;
+
+		format = __preview_get_format(prev, fh, PREV_PAD_SINK,
+					      sel->which);
+		preview_try_crop(prev, format, &sel->r);
+		break;
+
+	case V4L2_SEL_TGT_CROP:
+		sel->r = *__preview_get_crop(prev, fh, sel->which);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -1856,17 +1875,26 @@ static int preview_set_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
 	struct isp_prev_device *prev = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *format;
 
-	/* Cropping is only supported on the sink pad. */
-	if (crop->pad != PREV_PAD_SINK)
+	if (sel->target != V4L2_SEL_TGT_CROP ||
+	    sel->pad != PREV_PAD_SINK)
 		return -EINVAL;
 
 	/* The crop rectangle can't be changed while streaming. */
 	if (prev->state != ISP_PIPELINE_STREAM_STOPPED)
 		return -EBUSY;
 
-	format = __preview_get_format(prev, fh, PREV_PAD_SINK, crop->which);
-	preview_try_crop(prev, format, &crop->rect);
-	*__preview_get_crop(prev, fh, crop->which) = crop->rect;
+	/* Modifying the crop rectangle always changes the format on the source
+	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
+	 * rectangle.
+	 */
+	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
+		sel->r = *__preview_get_crop(prev, fh, sel->which);
+		return 0;
+	}
+
+	format = __preview_get_format(prev, fh, PREV_PAD_SINK, sel->which);
+	preview_try_crop(prev, format, &sel->r);
+	*__preview_get_crop(prev, fh, sel->which) = sel->r;
 
 	/* Update the source format. */
 	format = __preview_get_format(prev, fh, PREV_PAD_SOURCE, crop->which);

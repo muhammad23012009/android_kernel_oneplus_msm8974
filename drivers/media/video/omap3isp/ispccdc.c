@@ -1937,6 +1937,93 @@ static int ccdc_enum_frame_size(struct v4l2_subdev *sd,
 }
 
 /*
+ * ccdc_get_selection - Retrieve a selection rectangle on a pad
+ * @sd: ISP CCDC V4L2 subdevice
+ * @fh: V4L2 subdev file handle
+ * @sel: Selection rectangle
+ *
+ * The only supported rectangles are the crop rectangles on the output formatter
+ * source pad.
+ *
+ * Return 0 on success or a negative error code otherwise.
+ */
+static int ccdc_get_selection(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
+			      struct v4l2_subdev_selection *sel)
+{
+	struct isp_ccdc_device *ccdc = v4l2_get_subdevdata(sd);
+	struct v4l2_mbus_framefmt *format;
+
+	if (sel->pad != CCDC_PAD_SOURCE_OF)
+		return -EINVAL;
+
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		sel->r.left = 0;
+		sel->r.top = 0;
+		sel->r.width = INT_MAX;
+		sel->r.height = INT_MAX;
+
+		format = __ccdc_get_format(ccdc, fh, CCDC_PAD_SINK, sel->which);
+		ccdc_try_crop(ccdc, format, &sel->r);
+		break;
+
+	case V4L2_SEL_TGT_CROP:
+		sel->r = *__ccdc_get_crop(ccdc, fh, sel->which);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/*
+ * ccdc_set_selection - Set a selection rectangle on a pad
+ * @sd: ISP CCDC V4L2 subdevice
+ * @fh: V4L2 subdev file handle
+ * @sel: Selection rectangle
+ *
+ * The only supported rectangle is the actual crop rectangle on the output
+ * formatter source pad.
+ *
+ * Return 0 on success or a negative error code otherwise.
+ */
+static int ccdc_set_selection(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
+			      struct v4l2_subdev_selection *sel)
+{
+	struct isp_ccdc_device *ccdc = v4l2_get_subdevdata(sd);
+	struct v4l2_mbus_framefmt *format;
+
+	if (sel->target != V4L2_SEL_TGT_CROP ||
+	    sel->pad != CCDC_PAD_SOURCE_OF)
+		return -EINVAL;
+
+	/* The crop rectangle can't be changed while streaming. */
+	if (ccdc->state != ISP_PIPELINE_STREAM_STOPPED)
+		return -EBUSY;
+
+	/* Modifying the crop rectangle always changes the format on the source
+	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
+	 * rectangle.
+	 */
+	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
+		sel->r = *__ccdc_get_crop(ccdc, fh, sel->which);
+		return 0;
+	}
+
+	format = __ccdc_get_format(ccdc, fh, CCDC_PAD_SINK, sel->which);
+	ccdc_try_crop(ccdc, format, &sel->r);
+	*__ccdc_get_crop(ccdc, fh, sel->which) = sel->r;
+
+	/* Update the source format. */
+	format = __ccdc_get_format(ccdc, fh, CCDC_PAD_SOURCE_OF, sel->which);
+	ccdc_try_format(ccdc, fh, CCDC_PAD_SOURCE_OF, format, sel->which);
+
+	return 0;
+}
+
+/*
  * ccdc_get_format - Retrieve the video format on a pad
  * @sd : ISP CCDC V4L2 subdevice
  * @fh : V4L2 subdev file handle

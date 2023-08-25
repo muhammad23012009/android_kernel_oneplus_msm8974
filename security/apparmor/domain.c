@@ -13,8 +13,6 @@
  */
 
 #include <linux/errno.h>
-#include <linux/stddef.h>
-#include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/mount.h>
 #include <linux/syscalls.h>
@@ -608,7 +606,7 @@ int aa_change_hat(const char *hats[], int count, u64 token, bool permtest)
 	 * There is no exception for unconfined as change_hat is not
 	 * available.
 	 */
-	if (current->no_new_privs)
+	if (task_no_new_privs(current))
 		return -EPERM;
 
 	/* released below */
@@ -707,7 +705,7 @@ audit:
 	if (!permtest)
 		error = aa_audit_file(profile, &perms, OP_CHANGE_HAT,
 				      AA_MAY_CHANGEHAT, NULL, target,
-				      GLOBAL_ROOT_UID_APPARMOR, info, error);
+				      GLOBAL_ROOT_UID, info, error);
 
 out:
 	aa_put_profile(hat);
@@ -767,7 +765,7 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
 	 * no_new_privs is set because this aways results in a reduction
 	 * of permissions.
 	 */
-	if (current->no_new_privs && !unconfined(label)) {
+	if (task_no_new_privs(current) && !unconfined(label)) {
 		aa_put_label(label);
 		put_cred(cred);
 		return -EPERM;
@@ -823,13 +821,6 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
 	if (error)
 		goto audit;
 
-	if (onexec && !current_is_single_threaded()) {
-		info = "not a single threaded task";
-		error = -EACCES;
-		goto audit;
-	}
-
-
 	if (permtest)
 		goto audit;
 
@@ -841,7 +832,7 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
 audit:
 	if (!permtest)
 		error = aa_audit_file(profile, &perms, op, request, name,
-				      hname, GLOBAL_ROOT_UID_APPARMOR, info, error);
+				      hname, GLOBAL_ROOT_UID, info, error);
 
 	aa_put_namespace(ns);
 	aa_put_profile(target);

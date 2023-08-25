@@ -152,7 +152,7 @@ static void
 spufs_evict_inode(struct inode *inode)
 {
 	struct spufs_inode_info *ei = SPUFS_I(inode);
-	end_writeback(inode);
+	clear_inode(inode);
 	if (ei->i_ctx)
 		put_spu_context(ei->i_ctx);
 	if (ei->i_gang)
@@ -318,7 +318,7 @@ out:
 	return ret;
 }
 
-static int spufs_context_open(struct dentry *dentry, struct vfsmount *mnt)
+static int spufs_context_open(struct path *path)
 {
 	int ret;
 	struct file *filp;
@@ -330,7 +330,7 @@ static int spufs_context_open(struct dentry *dentry, struct vfsmount *mnt)
 		goto out;
 	}
 
-	filp = dentry_open(dentry, mnt, O_RDONLY, current_cred());
+	filp = dentry_open(path, O_RDONLY, current_cred());
 	if (IS_ERR(filp)) {
 		put_unused_fd(ret);
 		ret = PTR_ERR(filp);
@@ -454,6 +454,7 @@ spufs_create_context(struct inode *inode, struct dentry *dentry,
 	int affinity;
 	struct spu_gang *gang;
 	struct spu_context *neighbor;
+	struct path path = {.mnt = mnt, .dentry = dentry};
 
 	ret = -EPERM;
 	if ((flags & SPU_CREATE_NOSCHED) &&
@@ -496,11 +497,7 @@ spufs_create_context(struct inode *inode, struct dentry *dentry,
 			put_spu_context(neighbor);
 	}
 
-	/*
-	 * get references for dget and mntget, will be released
-	 * in error path of *_open().
-	 */
-	ret = spufs_context_open(dget(dentry), mntget(mnt));
+	ret = spufs_context_open(&path);
 	if (ret < 0) {
 		WARN_ON(spufs_rmdir(inode, dentry));
 		if (affinity)
@@ -557,7 +554,7 @@ out:
 	return ret;
 }
 
-static int spufs_gang_open(struct dentry *dentry, struct vfsmount *mnt)
+static int spufs_gang_open(struct path *path)
 {
 	int ret;
 	struct file *filp;
@@ -569,7 +566,11 @@ static int spufs_gang_open(struct dentry *dentry, struct vfsmount *mnt)
 		goto out;
 	}
 
-	filp = dentry_open(dentry, mnt, O_RDONLY, current_cred());
+	/*
+	 * get references for dget and mntget, will be released
+	 * in error path of *_open().
+	 */
+	filp = dentry_open(path, O_RDONLY, current_cred());
 	if (IS_ERR(filp)) {
 		put_unused_fd(ret);
 		ret = PTR_ERR(filp);
@@ -586,17 +587,14 @@ static int spufs_create_gang(struct inode *inode,
 			struct dentry *dentry,
 			struct vfsmount *mnt, umode_t mode)
 {
+	struct path path = {.mnt = mnt, .dentry = dentry};
 	int ret;
 
 	ret = spufs_mkgang(inode, dentry, mode & S_IRWXUGO);
 	if (ret)
 		goto out;
 
-	/*
-	 * get references for dget and mntget, will be released
-	 * in error path of *_open().
-	 */
-	ret = spufs_gang_open(dget(dentry), mntget(mnt));
+	ret = spufs_gang_open(&path);
 	if (ret < 0) {
 		int err = simple_rmdir(inode, dentry);
 		WARN_ON(err);

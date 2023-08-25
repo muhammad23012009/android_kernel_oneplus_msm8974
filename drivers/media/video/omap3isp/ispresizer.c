@@ -1255,16 +1255,70 @@ static void resizer_try_crop(const struct v4l2_mbus_framefmt *sink,
  * @which : active or try format
  * return -EINVAL or zero when succeed
  */
-static int resizer_s_crop(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh,
-			  struct v4l2_subdev_crop *crop)
+static int resizer_get_selection(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_fh *fh,
+				 struct v4l2_subdev_selection *sel)
+{
+	struct isp_res_device *res = v4l2_get_subdevdata(sd);
+	struct v4l2_mbus_framefmt *format_source;
+	struct v4l2_mbus_framefmt *format_sink;
+	struct resizer_ratio ratio;
+
+	if (sel->pad != RESZ_PAD_SINK)
+		return -EINVAL;
+
+	format_sink = __resizer_get_format(res, fh, RESZ_PAD_SINK,
+					   sel->which);
+	format_source = __resizer_get_format(res, fh, RESZ_PAD_SOURCE,
+					     sel->which);
+
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		sel->r.left = 0;
+		sel->r.top = 0;
+		sel->r.width = INT_MAX;
+		sel->r.height = INT_MAX;
+
+		resizer_try_crop(format_sink, format_source, &sel->r);
+		resizer_calc_ratios(res, &sel->r, format_source, &ratio);
+		break;
+
+	case V4L2_SEL_TGT_CROP:
+		sel->r = *__resizer_get_crop(res, fh, sel->which);
+		resizer_calc_ratios(res, &sel->r, format_source, &ratio);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/*
+ * resizer_set_selection - Set a selection rectangle on a pad
+ * @sd: ISP resizer V4L2 subdevice
+ * @fh: V4L2 subdev file handle
+ * @sel: Selection rectangle
+ *
+ * The only supported rectangle is the actual crop rectangle on the sink pad.
+ *
+ * FIXME: This function currently behaves as if the KEEP_CONFIG selection flag
+ * was always set.
+ *
+ * Return 0 on success or a negative error code otherwise.
+ */
+static int resizer_set_selection(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_fh *fh,
+				 struct v4l2_subdev_selection *sel)
 {
 	struct isp_res_device *res = v4l2_get_subdevdata(sd);
 	struct isp_device *isp = to_isp_device(res);
 	struct v4l2_mbus_framefmt *format_sink, *format_source;
 	struct resizer_ratio ratio;
 
-	/* Only sink pad has crop capability */
-	if (crop->pad != RESZ_PAD_SINK)
+	if (sel->target != V4L2_SEL_TGT_CROP ||
+	    sel->pad != RESZ_PAD_SINK)
 		return -EINVAL;
 
 	format_sink = __resizer_get_format(res, fh, RESZ_PAD_SINK,

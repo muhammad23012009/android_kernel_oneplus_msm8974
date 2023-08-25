@@ -208,7 +208,7 @@ static u32 map_old_perms(u32 old)
 }
 
 /**
- * compute_perms - convert dfa compressed perms to internal perms
+ * aa_compute_fperms - convert dfa compressed perms to internal perms
  * @dfa: dfa to compute perms for   (NOT NULL)
  * @state: state in dfa
  * @cond:  conditions to consider  (NOT NULL)
@@ -218,8 +218,8 @@ static u32 map_old_perms(u32 old)
  *
  * Returns: computed permission set
  */
-static struct file_perms compute_perms(struct aa_dfa *dfa, unsigned int state,
-				       struct path_cond *cond)
+struct file_perms aa_compute_fperms(struct aa_dfa *dfa, unsigned int state,
+				    struct path_cond *cond)
 {
 	struct file_perms perms;
 
@@ -273,7 +273,7 @@ unsigned int aa_str_perms(struct aa_dfa *dfa, unsigned int start,
 	}
 
 	state = aa_dfa_match(dfa, start, name);
-	*perms = compute_perms(dfa, state, cond);
+	*perms = aa_compute_fperms(dfa, state, cond);
 
 	return state;
 }
@@ -620,7 +620,7 @@ int aa_file_perm(int op, struct aa_label *label, struct file *file,
 
 	/* TODO: label cross check */
 
-	if (file->f_path.mnt && path_mediated_fs(file_inode(file))) {
+	if (file->f_path.mnt && path_mediated_fs(file->f_path.dentry)) {
 		error = __file_path_perm(op, label, flabel, file, request,
 					 denied);
 
@@ -681,7 +681,7 @@ void aa_inherit_files(const struct cred *cred, struct files_struct *files)
 	revalidate_tty(label);
 
 	/* Revalidate access to inherited open files. */
-	n = iterate_fd_apparmor(files, 0, match_file, label);
+	n = iterate_fd(files, 0, match_file, label);
 	if (!n) /* none found? */
 		goto out;
 
@@ -691,7 +691,7 @@ void aa_inherit_files(const struct cred *cred, struct files_struct *files)
 	/* replace all the matching ones with this */
 	do {
 		replace_fd(n - 1, devnull, 0);
-	} while ((n = iterate_fd_apparmor(files, n, match_file, label)) != 0);
+	} while ((n = iterate_fd(files, n, match_file, label)) != 0);
 	if (devnull)
 		fput(devnull);
 out:

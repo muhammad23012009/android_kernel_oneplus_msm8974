@@ -119,6 +119,8 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_reqbufs) (struct file *file, void *fh, struct v4l2_requestbuffers *b);
 	int (*vidioc_querybuf)(struct file *file, void *fh, struct v4l2_buffer *b);
 	int (*vidioc_qbuf)    (struct file *file, void *fh, struct v4l2_buffer *b);
+	int (*vidioc_expbuf)  (struct file *file, void *fh,
+				struct v4l2_exportbuffer *e);
 	int (*vidioc_dqbuf)   (struct file *file, void *fh, struct v4l2_buffer *b);
 
 	int (*vidioc_create_bufs)(struct file *file, void *fh, struct v4l2_create_buffers *b);
@@ -128,7 +130,7 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_fbuf)   (struct file *file, void *fh,
 				struct v4l2_framebuffer *a);
 	int (*vidioc_s_fbuf)   (struct file *file, void *fh,
-				struct v4l2_framebuffer *a);
+				const struct v4l2_framebuffer *a);
 
 		/* Stream on/off */
 	int (*vidioc_streamon) (struct file *file, void *fh, enum v4l2_buf_type i);
@@ -138,7 +140,7 @@ struct v4l2_ioctl_ops {
 			ENUMSTD is handled by videodev.c
 		 */
 	int (*vidioc_g_std) (struct file *file, void *fh, v4l2_std_id *norm);
-	int (*vidioc_s_std) (struct file *file, void *fh, v4l2_std_id *norm);
+	int (*vidioc_s_std) (struct file *file, void *fh, v4l2_std_id norm);
 	int (*vidioc_querystd) (struct file *file, void *fh, v4l2_std_id *a);
 
 		/* Input handling */
@@ -175,7 +177,7 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_audio)          (struct file *file, void *fh,
 					struct v4l2_audio *a);
 	int (*vidioc_s_audio)          (struct file *file, void *fh,
-					struct v4l2_audio *a);
+					const struct v4l2_audio *a);
 
 	/* Audio out ioctls */
 	int (*vidioc_enumaudout)       (struct file *file, void *fh,
@@ -183,11 +185,11 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_audout)         (struct file *file, void *fh,
 					struct v4l2_audioout *a);
 	int (*vidioc_s_audout)         (struct file *file, void *fh,
-					struct v4l2_audioout *a);
+					const struct v4l2_audioout *a);
 	int (*vidioc_g_modulator)      (struct file *file, void *fh,
 					struct v4l2_modulator *a);
 	int (*vidioc_s_modulator)      (struct file *file, void *fh,
-					struct v4l2_modulator *a);
+					const struct v4l2_modulator *a);
 	/* Crop ioctls */
 	int (*vidioc_cropcap)          (struct file *file, void *fh,
 					struct v4l2_cropcap *a);
@@ -203,7 +205,7 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_jpegcomp)       (struct file *file, void *fh,
 					struct v4l2_jpegcompression *a);
 	int (*vidioc_s_jpegcomp)       (struct file *file, void *fh,
-					struct v4l2_jpegcompression *a);
+					const struct v4l2_jpegcompression *a);
 	int (*vidioc_g_enc_index)      (struct file *file, void *fh,
 					struct v4l2_enc_idx *a);
 	int (*vidioc_encoder_cmd)      (struct file *file, void *fh,
@@ -225,11 +227,13 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_tuner)          (struct file *file, void *fh,
 					struct v4l2_tuner *a);
 	int (*vidioc_s_tuner)          (struct file *file, void *fh,
-					struct v4l2_tuner *a);
+					const struct v4l2_tuner *a);
 	int (*vidioc_g_frequency)      (struct file *file, void *fh,
 					struct v4l2_frequency *a);
 	int (*vidioc_s_frequency)      (struct file *file, void *fh,
-					struct v4l2_frequency *a);
+					const struct v4l2_frequency *a);
+	int (*vidioc_enum_freq_bands) (struct file *file, void *fh,
+				    struct v4l2_frequency_band *band);
 
 	/* Sliced VBI cap */
 	int (*vidioc_g_sliced_vbi_cap) (struct file *file, void *fh,
@@ -239,14 +243,17 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_log_status)       (struct file *file, void *fh);
 
 	int (*vidioc_s_hw_freq_seek)   (struct file *file, void *fh,
-					struct v4l2_hw_freq_seek *a);
+					const struct v4l2_hw_freq_seek *a);
 
 	/* Debugging ioctls */
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	int (*vidioc_g_register)       (struct file *file, void *fh,
 					struct v4l2_dbg_register *reg);
 	int (*vidioc_s_register)       (struct file *file, void *fh,
-					struct v4l2_dbg_register *reg);
+					const struct v4l2_dbg_register *reg);
+
+	int (*vidioc_g_chip_info)      (struct file *file, void *fh,
+					struct v4l2_dbg_chip_info *chip);
 #endif
 	int (*vidioc_g_chip_ident)     (struct file *file, void *fh,
 					struct v4l2_dbg_chip_ident *chip);
@@ -271,6 +278,12 @@ struct v4l2_ioctl_ops {
 				    struct v4l2_dv_timings *timings);
 	int (*vidioc_g_dv_timings) (struct file *file, void *fh,
 				    struct v4l2_dv_timings *timings);
+	int (*vidioc_query_dv_timings) (struct file *file, void *fh,
+				    struct v4l2_dv_timings *timings);
+	int (*vidioc_enum_dv_timings) (struct file *file, void *fh,
+				    struct v4l2_enum_dv_timings *timings);
+	int (*vidioc_dv_timings_cap) (struct file *file, void *fh,
+				    struct v4l2_dv_timings_cap *cap);
 
 	int (*vidioc_subscribe_event)  (struct v4l2_fh *fh,
 					struct v4l2_event_subscription *sub);
@@ -296,21 +309,19 @@ struct v4l2_ioctl_ops {
 		v4l_printk_ioctl(cmd);		 \
 	} while (0)
 
-/* Use this macro in I2C drivers where 'client' is the struct i2c_client
-   pointer */
-#define v4l_i2c_print_ioctl(client, cmd) 		   \
-	do {      					   \
-		v4l_client_printk(KERN_DEBUG, client, ""); \
-		v4l_printk_ioctl(cmd);			   \
-	} while (0)
-
 /*  Video standard functions  */
 extern const char *v4l2_norm_to_name(v4l2_std_id id);
 extern void v4l2_video_std_frame_period(int id, struct v4l2_fract *frameperiod);
 extern int v4l2_video_std_construct(struct v4l2_standard *vs,
 				    int id, const char *name);
-/* Prints the ioctl in a human-readable format */
+/* Prints the ioctl in a human-readable format. If prefix != NULL,
+   then do printk(KERN_DEBUG "%s: ", prefix) first. */
 extern void v4l_printk_ioctl(unsigned int cmd);
+
+/* Internal use only: get the mutex (if any) that we need to lock for the
+   given command. */
+struct video_device;
+extern struct mutex *v4l2_ioctl_get_lock(struct video_device *vdev, unsigned cmd);
 
 /* names for fancy debug output */
 extern const char *v4l2_field_names[];

@@ -338,7 +338,15 @@ config BACKPORT_BT_WILINK
 	  into the kernel or say M to compile it as module (btwilink).
 
 
-config BACKPORT_BT_MSM_BT_POWER
+config BACKPORT_BT_MSM_SLEEP
+        tristate "MSM Bluesleep driver"
+        depends on BACKPORT_BT && SERIAL_MSM_HS
+        default n
+        help
+          Bluetooth MSM bluesleep driver.
+          This driver provides support for BTS sleep.
+
+config BACKPORT_MSM_BT_POWER
         tristate "MSM Bluetooth Power Control"
         depends on ARCH_MSM && RFKILL
         default m

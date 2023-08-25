@@ -665,4 +665,3 @@ module_exit(hci_smd_exit);
 MODULE_AUTHOR("Ankur Nandwani <ankurn@codeaurora.org>");
 MODULE_DESCRIPTION("Bluetooth SMD driver");
 MODULE_LICENSE("GPL v2");
-

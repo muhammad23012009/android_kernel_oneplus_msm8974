@@ -209,7 +209,7 @@ static void __remove_shared_vm_struct(struct vm_area_struct *vma,
 	if (vma->vm_flags & VM_DENYWRITE)
 		atomic_inc(&file->f_path.dentry->d_inode->i_writecount);
 	if (vma->vm_flags & VM_SHARED)
-		mapping->i_mmap_writable--;
+		atomic_dec(&mapping->i_mmap_writable);
 
 	flush_dcache_mmap_lock(mapping);
 	if (unlikely(vma->vm_flags & VM_NONLINEAR))
@@ -546,7 +546,7 @@ static void __vma_link_file(struct vm_area_struct *vma)
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_dec(&file->f_path.dentry->d_inode->i_writecount);
 		if (vma->vm_flags & VM_SHARED)
-			mapping->i_mmap_writable++;
+			atomic_inc(&mapping->i_mmap_writable);
 
 		flush_dcache_mmap_lock(mapping);
 		if (unlikely(vma->vm_flags & VM_NONLINEAR))
@@ -810,8 +810,7 @@ static inline int is_mergeable_vma(struct vm_area_struct *vma,
 			struct file *file, unsigned long vm_flags,
 			const char __user *anon_name)
 {
-	/* VM_CAN_NONLINEAR may get set later by f_op->mmap() */
-	if ((vma->vm_flags ^ vm_flags) & ~VM_CAN_NONLINEAR)
+	if (vma->vm_flags ^ vm_flags)
 		return 0;
 	if (vma->vm_file != file)
 		return 0;
@@ -1247,7 +1246,11 @@ static unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 		}
 	}
 
-	error = security_file_mmap(file, reqprot, prot, flags, addr, 0);
+	error = security_mmap_addr(addr);
+	if (error)
+		return error;
+
+	error = security_mmap_file(file, reqprot, prot, flags);
 	if (error)
 		return error;
 
@@ -2094,7 +2097,7 @@ int expand_downwards(struct vm_area_struct *vma,
 		return -ENOMEM;
 
 	address &= PAGE_MASK;
-	error = security_file_mmap(NULL, 0, 0, 0, address, 1);
+	error = security_mmap_addr(address);
 	if (error)
 		return error;
 
@@ -2508,7 +2511,7 @@ static unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (!len)
 		return addr;
 
-	error = security_file_mmap(NULL, 0, 0, 0, addr, 1);
+	error = security_mmap_addr(addr);
 	if (error)
 		return error;
 
@@ -2854,7 +2857,7 @@ int install_special_mapping(struct mm_struct *mm,
 	vma->vm_ops = &special_mapping_vmops;
 	vma->vm_private_data = pages;
 
-	ret = security_file_mmap(NULL, 0, 0, 0, vma->vm_start, 1);
+	ret = security_mmap_addr(vma->vm_start);
 	if (ret)
 		goto out;
 

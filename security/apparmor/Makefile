@@ -4,7 +4,7 @@ obj-$(CONFIG_SECURITY_APPARMOR) += apparmor.o
 
 apparmor-y := apparmorfs.o audit.o capability.o context.o ipc.o lib.o match.o \
               path.o domain.o policy.o policy_unpack.o procattr.o lsm.o \
-              resource.o sid.o file.o label.o mount.o net.o af_unix.o backport.o
+              resource.o sid.o file.o label.o mount.o net.o af_unix.o
 apparmor-$(CONFIG_SECURITY_APPARMOR_HASH) += crypto.o
 
 clean-files := capability_names.h rlim_names.h net_names.h
@@ -96,10 +96,10 @@ cmd_make-rlim = echo "static const char *const rlim_names[RLIM_NLIMITS] = {" \
 $(obj)/capability.o : $(obj)/capability_names.h
 $(obj)/net.o : $(obj)/net_names.h
 $(obj)/resource.o : $(obj)/rlim_names.h
-$(obj)/capability_names.h : $(srctree)/include/linux/capability.h \
+$(obj)/capability_names.h : $(srctree)/include/uapi/linux/capability.h \
 			    $(src)/Makefile
 	$(call cmd,make-caps)
-$(obj)/rlim_names.h : $(srctree)/include/asm-generic/resource.h \
+$(obj)/rlim_names.h : $(srctree)/include/uapi/asm-generic/resource.h \
 		      $(src)/Makefile
 	$(call cmd,make-rlim)
 $(obj)/net_names.h : $(srctree)/include/linux/socket.h \

@@ -102,6 +102,44 @@ static LIST_HEAD(modules);
 struct list_head *kdb_modules = &modules; /* kdb needs the list of modules */
 #endif /* CONFIG_KGDB_KDB */
 
+#ifdef CONFIG_MODULE_SIG
+#ifdef CONFIG_MODULE_SIG_FORCE
+static bool sig_enforce = true;
+#else
+static bool sig_enforce = false;
+
+static int param_set_bool_enable_only(const char *val,
+				      const struct kernel_param *kp)
+{
+	int err;
+	bool test;
+	struct kernel_param dummy_kp = *kp;
+
+	dummy_kp.arg = &test;
+
+	err = param_set_bool(val, &dummy_kp);
+	if (err)
+		return err;
+
+	/* Don't let them unset it once it's set! */
+	if (!test && sig_enforce)
+		return -EROFS;
+
+	if (test)
+		sig_enforce = true;
+	return 0;
+}
+
+static const struct kernel_param_ops param_ops_bool_enable_only = {
+	.flags = KERNEL_PARAM_OPS_FL_NOARG,
+	.set = param_set_bool_enable_only,
+	.get = param_get_bool,
+};
+#define param_check_bool_enable_only param_check_bool
+
+module_param(sig_enforce, bool_enable_only, 0644);
+#endif /* !CONFIG_MODULE_SIG_FORCE */
+#endif /* CONFIG_MODULE_SIG */
 
 /* Block module loading/unloading? */
 int modules_disabled = 0;

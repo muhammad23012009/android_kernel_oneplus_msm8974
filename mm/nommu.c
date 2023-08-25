@@ -1047,7 +1047,10 @@ static int validate_mmap_request(struct file *file,
 	}
 
 	/* allow the security API to have its say */
-	ret = security_file_mmap(file, reqprot, prot, flags, addr, 0);
+	ret = security_mmap_addr(addr);
+	if (ret < 0)
+		return ret;
+	ret = security_mmap_file(file, reqprot, prot, flags);
 	if (ret < 0)
 		return ret;
 
@@ -1997,6 +2000,14 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return 0;
 }
 EXPORT_SYMBOL(filemap_fault);
+
+int generic_file_remap_pages(struct vm_area_struct *vma, unsigned long addr,
+			     unsigned long size, pgoff_t pgoff)
+{
+	BUG();
+	return 0;
+}
+EXPORT_SYMBOL(generic_file_remap_pages);
 
 static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, int write)

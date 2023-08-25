@@ -670,10 +670,9 @@ int open_check_o_direct(struct file *f)
 	return 0;
 }
 
-static struct file *do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
-				   struct file *f,
-				   int (*open)(struct inode *, struct file *),
-				   const struct cred *cred)
+static int do_dentry_open(struct file *f,
+			  int (*open)(struct inode *, struct file *),
+			  const struct cred *cred)
 {
 	static const struct file_operations empty_fops = {};
 	struct inode *inode;
@@ -685,9 +684,9 @@ static struct file *do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	if (unlikely(f->f_flags & O_PATH))
 		f->f_mode = FMODE_PATH;
 
-	inode = dentry->d_inode;
+	inode = f->f_inode = f->f_path.dentry->d_inode;
 	if (f->f_mode & FMODE_WRITE) {
-		error = __get_file_write_access(inode, mnt);
+		error = __get_file_write_access(inode, f->f_path.mnt);
 		if (error)
 			goto cleanup_file;
 		if (!special_file(inode->i_mode))
@@ -695,13 +694,11 @@ static struct file *do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	}
 
 	f->f_mapping = inode->i_mapping;
-	f->f_path.dentry = dentry;
-	f->f_path.mnt = mnt;
 	f->f_pos = 0;
 
 	if (unlikely(f->f_mode & FMODE_PATH)) {
 		f->f_op = &empty_fops;
-		return f;
+		return 0;
 	}
 
 	if (S_ISREG(inode->i_mode))
@@ -710,7 +707,7 @@ static struct file *do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 
 	f->f_op = fops_get(inode->i_fop);
 
-	error = security_dentry_open(f, cred);
+	error = security_file_open(f, cred);
 	if (error)
 		goto cleanup_all;
 
@@ -732,7 +729,7 @@ static struct file *do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
 
-	return f;
+	return 0;
 
 cleanup_all:
 	fops_put(f->f_op);
@@ -746,33 +743,17 @@ cleanup_all:
 			 * here, so just reset the state.
 			 */
 			file_reset_write(f);
-			mnt_drop_write(mnt);
+			mnt_drop_write(f->f_path.mnt);
 		}
 	}
 	f->f_path.dentry = NULL;
 	f->f_path.mnt = NULL;
+	f->f_inode = NULL;
 cleanup_file:
-	dput(dentry);
-	mntput(mnt);
-	return ERR_PTR(error);
-}
-
-static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
-				struct file *f,
-				int (*open)(struct inode *, struct file *),
-				const struct cred *cred)
-{
-	struct file *res = do_dentry_open(dentry, mnt, f, open, cred);
-	if (!IS_ERR(res)) {
-		int error = open_check_o_direct(f);
-		if (error) {
-			fput(res);
-			res = ERR_PTR(error);
-		}
-	} else {
-		put_filp(f);
-	}
-	return res;
+	path_put(&f->f_path);
+	f->f_path.mnt = NULL;
+	f->f_path.dentry = NULL;
+	return error;
 }
 
 /**
@@ -790,19 +771,17 @@ int finish_open(struct file *file, struct dentry *dentry,
 		int (*open)(struct inode *, struct file *),
 		int *opened)
 {
-	struct file *res;
+	int error;
 	BUG_ON(*opened & FILE_OPENED); /* once it's opened, it's opened */
 
 	mntget(file->f_path.mnt);
-	dget(dentry);
+	file->f_path.dentry = dget(dentry);
 
-	res = do_dentry_open(dentry, file->f_path.mnt, file, open, current_cred());
-	if (!IS_ERR(res)) {
+	error = do_dentry_open(file, open, current_cred());
+	if (!error)
 		*opened |= FILE_OPENED;
-		return 0;
-	}
 
-	return PTR_ERR(res);
+	return error;
 }
 EXPORT_SYMBOL(finish_open);
 
@@ -822,11 +801,7 @@ int finish_no_open(struct file *file, struct dentry *dentry)
 }
 EXPORT_SYMBOL(finish_no_open);
 
-/*
- * dentry_open() will have done dput(dentry) and mntput(mnt) if it returns an
- * error.
- */
-struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags,
+struct file *dentry_open(const struct path *path, int flags,
 			 const struct cred *cred)
 {
 	int error;
@@ -835,64 +810,30 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags,
 	validate_creds(cred);
 
 	/* We must always pass in a valid mount pointer. */
-	BUG_ON(!mnt);
+	BUG_ON(!path->mnt);
 
 	error = -ENFILE;
 	f = get_empty_filp();
-	if (f == NULL) {
-		dput(dentry);
-		mntput(mnt);
+	if (f == NULL)
 		return ERR_PTR(error);
-	}
 
 	f->f_flags = flags;
-	return __dentry_open(dentry, mnt, f, NULL, cred);
+	f->f_path = *path;
+	path_get(&f->f_path);
+	error = do_dentry_open(f, NULL, cred);
+	if (!error) {
+		error = open_check_o_direct(f);
+		if (error) {
+			fput(f);
+			f = ERR_PTR(error);
+		}
+	} else { 
+		put_filp(f);
+		f = ERR_PTR(error);
+	}
+	return f;
 }
 EXPORT_SYMBOL(dentry_open);
-
-static void __put_unused_fd(struct files_struct *files, unsigned int fd)
-{
-	struct fdtable *fdt = files_fdtable(files);
-	__clear_open_fd(fd, fdt);
-	if (fd < files->next_fd)
-		files->next_fd = fd;
-}
-
-void put_unused_fd(unsigned int fd)
-{
-	struct files_struct *files = current->files;
-	spin_lock(&files->file_lock);
-	__put_unused_fd(files, fd);
-	spin_unlock(&files->file_lock);
-}
-
-EXPORT_SYMBOL(put_unused_fd);
-
-/*
- * Install a file pointer in the fd array.
- *
- * The VFS is full of places where we drop the files lock between
- * setting the open_fds bitmap and installing the file in the file
- * array.  At any such point, we are vulnerable to a dup2() race
- * installing a file in the array before us.  We need to detect this and
- * fput() the struct file we are about to overwrite in this case.
- *
- * It should never happen - if we allow dup2() do it, _really_ bad things
- * will follow.
- */
-
-void fd_install(unsigned int fd, struct file *file)
-{
-	struct files_struct *files = current->files;
-	struct fdtable *fdt;
-	spin_lock(&files->file_lock);
-	fdt = files_fdtable(files);
-	BUG_ON(fdt->fd[fd] != NULL);
-	rcu_assign_pointer(fdt->fd[fd], file);
-	spin_unlock(&files->file_lock);
-}
-
-EXPORT_SYMBOL(fd_install);
 
 static inline int build_open_flags(int flags, umode_t mode, struct open_flags *op)
 {
@@ -1109,23 +1050,7 @@ EXPORT_SYMBOL(filp_close);
  */
 SYSCALL_DEFINE1(close, unsigned int, fd)
 {
-	struct file * filp;
-	struct files_struct *files = current->files;
-	struct fdtable *fdt;
-	int retval;
-
-	spin_lock(&files->file_lock);
-	fdt = files_fdtable(files);
-	if (fd >= fdt->max_fds)
-		goto out_unlock;
-	filp = fdt->fd[fd];
-	if (!filp)
-		goto out_unlock;
-	rcu_assign_pointer(fdt->fd[fd], NULL);
-	__clear_close_on_exec(fd, fdt);
-	__put_unused_fd(files, fd);
-	spin_unlock(&files->file_lock);
-	retval = filp_close(filp, files);
+	int retval = __close_fd(current->files, fd);
 
 	/* can't restart close syscall because file table entry was cleared */
 	if (unlikely(retval == -ERESTARTSYS ||
@@ -1135,10 +1060,6 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 		retval = -EINTR;
 
 	return retval;
-
-out_unlock:
-	spin_unlock(&files->file_lock);
-	return -EBADF;
 }
 EXPORT_SYMBOL(sys_close);
 
